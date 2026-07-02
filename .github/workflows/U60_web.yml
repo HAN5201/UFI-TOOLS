@@ -1,17 +1,22 @@
+name: 中兴 U60p 网页控制台真正云编译
+
+on:
+  workflow_dispatch: # 允许手动点击运行
+
+jobs:
+  build_job:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # 强制开启仓库写入权限，防止 GitHub 拦截
 
     steps:
-      - name: 1. 拉取仓库源码
+      - name: 1. 拉取源码
         uses: actions/checkout@v4
 
-      - name: 2. 初始化前端 Node 环境
+      - name: 2. 安装 Node.js 环境
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: 3. 注入 U60p 网速同步补丁
+      - name: 3. 注入 U60p 1秒网速追踪补丁
         run: |
           TARGET_FILE="app/frontEnd/src/components/NetworkStatus.vue"
           if [ -f "$TARGET_FILE" ]; then
@@ -19,22 +24,14 @@
             sed -i 's/5000/1000/g' "$TARGET_FILE"
           fi
 
-      - name: 4. 编译网页静态资源
+      - name: 4. 执行网页编译
         run: |
           cd app/frontEnd
           npm install
           npm run build
 
-      - name: 5. 将成品打包成压缩包
-        run: |
-          cd app/frontEnd/dist
-          zip -r ../../../U60p_Web_Console.zip .
-
-      - name: 6. 强行推送到 Release 页面 (绝不失手)
-        uses: softprops/action-gh-release@v2
+      - name: 5. 【核心】真正将网页打包并在网页下方生成文件
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: v1.0.0_${{ github.run_id }}
-          name: 中兴 U60p 专属控制台成品
-          files: U60p_Web_Console.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: ZTE_U60p_Web_Console_Ready # 编译出的成品文件名
+          path: app/frontEnd/dist/ # 告诉 GitHub 把这个文件夹里的所有网页文件打包
