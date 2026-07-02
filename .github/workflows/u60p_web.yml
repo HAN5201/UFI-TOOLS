@@ -1,7 +1,7 @@
 name: 中兴 U60p 网页控制台真正云编译
 
 on:
-  workflow_dispatch: # 允许你手动点击按钮开始编译
+  workflow_dispatch:
 
 jobs:
   build_job:
@@ -18,20 +18,25 @@ jobs:
 
       - name: 3. 注入 U60p 1秒网速追踪补丁
         run: |
-          TARGET_FILE="app/frontEnd/src/components/NetworkStatus.vue"
-          if [ -f "$TARGET_FILE" ]; then
-            sed -i 's/3000/1000/g' "$TARGET_FILE"
-            sed -i 's/5000/1000/g' "$TARGET_FILE"
-          fi
+          # 遍历寻找 NetworkStatus.vue 文件并替换时间
+          find . -name "NetworkStatus.vue" -exec sed -i 's/3000/1000/g' {} +
+          find . -name "NetworkStatus.vue" -exec sed -i 's/5000/1000/g' {} +
 
-      - name: 4. 执行网页编译
+      - name: 4. 执行网页编译（自动识别正确目录）
         run: |
-          cd app/frontEnd
+          if [ -d "app/frontEnd" ]; then
+            cd app/frontEnd
+          elif [ -d "frontend" ]; then
+            cd frontend
+          fi
           npm install
           npm run build
 
-      - name: 5. 将网页打包并在网页下方生成文件
+      - name: 5. 【核心】自动搜寻编译好的文件夹并上传
         uses: actions/upload-artifact@v4
         with:
           name: ZTE_U60p_Web_Console_Ready
-          path: app/frontEnd/dist/
+          path: |
+            **/dist/
+            **/build/
+            !node_modules/
