@@ -1,38 +1,32 @@
-ame: 编译中兴 U60p 专属 UFI-TOOLS
-
-on:
-  workflow_dispatch: # 允许你手动点击按钮开始编译
-
-jobs:
-  build:
+  build_console:
     runs-on: ubuntu-latest
 
     steps:
       - name: 1. 拉取仓库源码
         uses: actions/checkout@v4
 
-      - name: 2. 安装 Node.js 编译环境
+      - name: 2. 初始化前端 Node 环境
         uses: actions/setup-node@v4
         with:
-          node-size: 18
+          node-version: 18
 
-      - name: 3. 注入 U60p 签约速率秒级同步补丁
+      - name: 3. 注入 U60p 1秒级网速同步补丁
         run: |
           TARGET_FILE="app/frontEnd/src/components/NetworkStatus.vue"
           if [ -f "$TARGET_FILE" ]; then
             sed -i 's/3000/1000/g' "$TARGET_FILE"
             sed -i 's/5000/1000/g' "$TARGET_FILE"
-            echo "1秒级高频网络同步补丁注入成功！"
+            echo "补丁注入成功！"
           fi
 
-      - name: 4. 执行 npm 依赖安装与静态网页编译
+      - name: 4. 编译网页静态资源
         run: |
           cd app/frontEnd
           npm install
           npm run build
 
-      - name: 5. 打包并发布编译成品
+      - name: 5. 强制打包并输出到网页底部 (关键步骤)
         uses: actions/upload-artifact@v4
         with:
-          name: U60p_UfiTools_Web_Console
+          name: U60p_ZTE_Web_Console_Finished
           path: app/frontEnd/dist/
