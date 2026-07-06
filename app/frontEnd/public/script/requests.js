@@ -77,6 +77,57 @@ const common_headers = {
     "authorization": KANO_TOKEN
 }
 
+const requestIsLogin = async () => {
+    const res = await fetch(KANO_baseURL + "/goform/goform_get_cmd_process?isTest=false&cmd=loginfo&_=" + Date.now(), {
+        method: "GET",
+        headers: {
+            "kano-cookie": KANO_COOKIE,
+            ...common_headers,
+        }
+    })
+    return await res.json()
+}
+
+const getCookieFromUFI = async () => {
+    try {
+        const res = await fetch(KANO_baseURL + "/get_cookie", {
+            method: "GET",
+            headers: {
+                ...common_headers,
+            }
+        })
+        return await res.json()
+    } catch {
+        return null
+    }
+}
+
+const setCookieToUFI = async (ck) => {
+    try {
+        const res = await fetch(KANO_baseURL + "/set_cookie", {
+            method: "POST",
+            headers: {
+                ...common_headers,
+            },
+            body: JSON.stringify({ cookie: ck })
+        })
+        return await res.json()
+    } catch {
+        return null
+    }
+}
+
+const setKanoCookie = async (ck) => {
+    if (!ck) return
+    KANO_COOKIE = ck
+    try {
+        const res = await setCookieToUFI(ck)
+        return res.result
+    } catch {
+        return false
+    }
+}
+
 const login1 = async () => {
     try {
         const { LD } = await getLD()
@@ -102,7 +153,8 @@ const login1 = async () => {
             return null
         }
         const ck = res.headers.get('kano-cookie').split(';')[0]
-        KANO_COOKIE = ck
+        // KANO_COOKIE = ck
+        await setKanoCookie(ck)
         return ck
     }
     catch {
@@ -137,7 +189,8 @@ let login2 = async () => {
         }
         //设置全局cookie
         const ck = res.headers.get('kano-cookie').split(';')[0]
-        KANO_COOKIE = ck
+        // KANO_COOKIE = ck
+        await setKanoCookie(ck)
         return ck
     }
     catch {
@@ -146,11 +199,44 @@ let login2 = async () => {
 }
 
 let login = async () => {
+    try {
+        // 从服务端获取保存的 Cookie
+        const data = await getCookieFromUFI()
+        const cookie = data && data.cookie
+
+        if (cookie && cookie !== "") {
+            KANO_COOKIE = cookie
+        }
+    } catch (e) {
+        console.error("从设备获取保存的ck失败：", e)
+    }
+
+    if (KANO_COOKIE && KANO_COOKIE !== "") {
+        try {
+            const data = await requestIsLogin()
+            const loginfo = data && data.loginfo
+
+            if (loginfo === 'ok') {
+                console.log("Cookie有效，不需要再次登录")
+                return KANO_COOKIE
+            }
+
+            // Cookie 无效，需要清空服务端持久化 Cookie
+            KANO_COOKIE = ""
+            await setKanoCookie("")
+
+        } catch (e) {
+            console.error("requestIsLogin请求失败：", e)
+        }
+    }
+
     if (loginMethod == '1') {
         return await login2()
     }
+
     return await login1()
 }
+
 
 const logout = async (cookie) => {
     const AD = await processAD(cookie)
@@ -621,3 +707,56 @@ const getNetConnInfo = async () => {
     }
     return null
 }
+
+//seConntHostName
+const seConntHostName = async (mac, hostname) => {
+    const formData = {
+        goformId: "EDIT_HOSTNAME",
+        mac,
+        hostname
+    }
+    const res = await postData(await login(), formData)
+    return res.json()
+}
+
+const getDailyUsageRange = async (start, endTime, method = 'date-range') => {
+    if (method == 'date-range') {
+        const startTime = new Date(start)
+        const end = new Date(endTime)
+        startTime.setHours(0, 0, 0, 0)
+        end.setHours(23, 59, 59, 999)
+        const res = await fetchWithTimeout(
+            `${KANO_baseURL}/cellularUsage?startTime=${startTime.getTime()}&endTime=${end.getTime()}&method=${method}`
+        );
+
+        const data = await res.json();
+        return data.usage
+    }
+
+    const result = [];
+
+    for (let d = new Date(start); d <= endTime; d.setDate(d.getDate() + 1)) {
+        const dayStart = new Date(d);
+        dayStart.setHours(0, 0, 0, 0);
+
+        const dayEnd = new Date(d);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        if (dayEnd > endTime) {
+            dayEnd.setTime(endTime.getTime());
+        }
+
+        const res = await fetchWithTimeout(
+            `${KANO_baseURL}/cellularUsage?startTime=${dayStart.getTime()}&endTime=${dayEnd.getTime()}&method=${method}`
+        );
+
+        const data = await res.json();
+
+        result.push({
+            date: formatLocalDate(dayStart),
+            usage: data.usage
+        });
+    }
+
+    return result;
+};

@@ -575,6 +575,17 @@ function main_func() {
             closeModal('#tokenModal')
             initRenderMethod()
             initMessage()
+            //记住密码
+            const loginRememberMe = document.querySelector('#loginRememberMe')
+            if (loginRememberMe && loginRememberMe.checked) {
+                //AES加密存储密码
+                if (CryptoJS) {
+                    const payload = CryptoJS.AES.encrypt(`${password.trim()}<kano_CryptoJS_split>${token.trim()}`, 'kano_secret_key_1145141919810721')
+                    localStorage.setItem('kano_remembered_loginfo', payload)
+                }
+            } else if (loginRememberMe && !loginRememberMe.checked) {
+                localStorage.removeItem('kano_remembered_loginfo')
+            }
         }
         catch (e) {
             toastTimer && clearTimeout(toastTimer)
@@ -693,6 +704,10 @@ function main_func() {
             const res = await removeSmsById(id);
             if (res?.result === 'success') {
                 if (!flag) {
+                    try {
+                        //尝试删除element
+                        message.parentElement.parentElement.remove()
+                    } catch { }
                     createToast(t('toast_delete_success'), 'green');
                 }
                 setTimeout(() => {
@@ -732,16 +747,29 @@ function main_func() {
 
     let isFirstRender = true
     let lastRequestSmsIds = null
+    let cachedSmsRes = null
     let handleSmsRender = async () => {
         let list = document.querySelector('#sms-list')
         if (!list) createToast(t('toast_sms_list_node_not_found'), 'red')
         if (isFirstRender) {
             list.innerHTML = ` <li><h2 style="padding: 30px;text-align:center;height:100vh">Loading...</h2></li>`
         }
-        isFirstRender = false
         showModal('#smsList')
-        let res = await getSms()
-        if (res && res.length) {
+        let res = null
+        try {
+            res = await getSms()
+        } catch (e) {
+            res = null
+        }
+        if (res && (res.length > 0)) {
+            cachedSmsRes = safeClone(res)
+        } else {
+            if (isFirstRender == true) {
+                return
+            }
+            res = cachedSmsRes
+        }
+        if (res && (res.length > 0)) {
             //防止重复渲染
             let ids = res.map(item => item.id).join('')
             if (ids === lastRequestSmsIds) return
@@ -772,12 +800,12 @@ function main_func() {
                 }).join('')
                 return `<li class="sms-item" data-sms-id="${item.id}" data-sms-phone="${item.number}" data-sms-content="${item.content}" style="${item.tag == '3' ? 'background-color:#ffc0cb1f;margin-right:15px' : item.tag != '2' ? 'background-color:#0880001f;margin-left:15px' : 'background-color:#ffc0cb1f;margin-right:15px'}">
                                         <div class="arrow" style="${item.tag == '3' ? 'right:-30px;border-color: transparent transparent transparent #ffc0cb1f' : item.tag == '2' ? 'right:-30px;border-color: transparent transparent transparent #ffc0cb1f' : 'left:-30px;border-color: transparent #0880001f transparent transparent'}"></div>
-                                        ${item.tag == "3" ? `<svg onclick="deleteAndReSendSms(${item.id})" class="icon" style="position: absolute;right: 50px;top: 18px;" width="14px" height="14px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                <path fill="red" d="M815.36 184.96V128a36.48 36.48 0 0 1 10.24-26.88 37.76 37.76 0 0 1 52.48 0 40.96 40.96 0 0 1 11.52 26.88v172.16a40.32 40.32 0 0 1-37.12 37.12h-173.44a40.32 40.32 0 0 1-26.88-11.52 37.76 37.76 0 0 1 0-52.48 35.84 35.84 0 0 1 26.88-10.24h108.8a372.48 372.48 0 0 0-453.12-75.52A367.36 367.36 0 0 0 170.24 364.8a374.4 374.4 0 0 0-19.84 242.56 369.92 369.92 0 0 0 132.48 202.24A375.04 375.04 0 0 0 512 888.32a368.64 368.64 0 0 0 263.68-108.8A376.32 376.32 0 0 0 885.12 512H960A448 448 0 1 1 136.32 270.08a438.4 438.4 0 0 1 192-164.48 444.16 444.16 0 0 1 256-32 455.68 455.68 0 0 1 230.4 111.36z"></path>
+                                        ${item.tag == "3" ? `<svg fill="var(--dark-text-color)" stroke="currentColor"  onclick="deleteAndReSendSms(${item.id})" class="icon" style="position: absolute;right: 50px;top: 18px;" width="14px" height="14px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                <path d="M815.36 184.96V128a36.48 36.48 0 0 1 10.24-26.88 37.76 37.76 0 0 1 52.48 0 40.96 40.96 0 0 1 11.52 26.88v172.16a40.32 40.32 0 0 1-37.12 37.12h-173.44a40.32 40.32 0 0 1-26.88-11.52 37.76 37.76 0 0 1 0-52.48 35.84 35.84 0 0 1 26.88-10.24h108.8a372.48 372.48 0 0 0-453.12-75.52A367.36 367.36 0 0 0 170.24 364.8a374.4 374.4 0 0 0-19.84 242.56 369.92 369.92 0 0 0 132.48 202.24A375.04 375.04 0 0 0 512 888.32a368.64 368.64 0 0 0 263.68-108.8A376.32 376.32 0 0 0 885.12 512H960A448 448 0 1 1 136.32 270.08a438.4 438.4 0 0 1 192-164.48 444.16 444.16 0 0 1 256-32 455.68 455.68 0 0 1 230.4 111.36z"></path>
             </svg>`: ""}
                                         <div class="icon" onclick="deleteSMS(${item.id})">
                                             <span id="message${item.id}" style="color: red;position: absolute;width: 100px;top: 2px;right: 30px;background: var(--dark-tag-color-active);display: none;text-align: center;padding: 4px;border-radius: 8px;backdrop-filter: blur(var(--blur-rate));">确定要删除吗？</span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" t="1742373390977" class="icon" viewBox="0 0 1024 1024" version="1.1" p-id="2837" width="16" height="16"><path d="M848 144H608V96a48 48 0 0 0-48-48h-96a48 48 0 0 0-48 48v48H176a48 48 0 0 0-48 48v48h768v-48a48 48 0 0 0-48-48zM176 928a48 48 0 0 0 48 48h576a48 48 0 0 0 48-48V288H176v640z m480-496a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z m-192 0a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z m-192 0a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z" fill="" p-id="2838"/></svg>
+                                            <svg fill="var(--dark-text-color)" stroke="currentColor"  xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" t="1742373390977" class="icon" viewBox="0 0 1024 1024" version="1.1" p-id="2837" width="16" height="16"><path d="M848 144H608V96a48 48 0 0 0-48-48h-96a48 48 0 0 0-48 48v48H176a48 48 0 0 0-48 48v48h768v-48a48 48 0 0 0-48-48zM176 928a48 48 0 0 0 48 48h576a48 48 0 0 0 48-48V288H176v640z m480-496a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z m-192 0a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z m-192 0a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z" p-id="2838"/></svg>
                                         </div>
                                         <p style="color:#adadad;font-size:16px;margin:4px 0">${item.number}${item.tag == '3' ? ` <span style="font-size:.7rem;color:red">(${t("toast_sms_send_failed")})</span>` : ""}</p>
                                         <p>${decodeBase64(item.content)}</p>
@@ -791,6 +819,7 @@ function main_func() {
             }
             list.innerHTML = ` <li> <h2 style="padding: 30px;text-align:center;">${t('no_sms')}</h2></li >`
         }
+        isFirstRender = false
     }
 
     let cachedDiagImeiQueryResult = ''
@@ -827,6 +856,7 @@ function main_func() {
     let StopStatusRenderTimer = null
     let isNotLoginOnce = true
     let status_login_try_times = 0
+    let data_limit_toast_shown = false
     let handlerStatusRender = async (flag = false) => {
         const status = document.querySelector('#STATUS')
         if (flag) {
@@ -859,6 +889,10 @@ function main_func() {
             return
         }
         if (res) {
+            if (res.is_reached_data_flow_limit && !data_limit_toast_shown) {
+                createToast(t("data_flow_limit_reached", "pink", 8000))
+                data_limit_toast_shown = true
+            }
             //需要一直保持登录
             if (res.loginfo && res.loginfo != 'ok') {
                 try {
@@ -887,9 +921,17 @@ function main_func() {
                             status_login_try_times = 0
                             return
                         }
+                        //立即重新执行函数
+                        handlerStatusRender()
+                        if (typeof StopStatusRenderTimer == 'function') {
+                            StopStatusRenderTimer()
+                            StopStatusRenderTimer = requestInterval(() => handlerStatusRender(), REFRESH_TIME)
+                        }
                         return //跳过本次渲染
                     }
-                } catch (e) { }
+                } catch (e) {
+                    console.error("handlerStatusRender retry error:", e)
+                }
             }
 
             //如果打开了高级功能，且用户已经处于改串后不显串状态，则使用强力查串补充串号显示
@@ -908,7 +950,6 @@ function main_func() {
             Object.keys(res).forEach(key => {
                 window.UFI_DATA[key] = res[key];
             });
-
             adbQuery()
             isNotLoginOnce = false
             let html = ''
@@ -1232,6 +1273,40 @@ function main_func() {
             })
         } catch { }
         await needToken()
+        const label = document.querySelector("#token_div_label2")
+        const tokenEl = document.querySelector("#PWD_BLK")
+        const pwdEl = document.querySelector("#PWDINPUT")
+        const tokenInput = document.querySelector("#TOKEN")
+        label.style.display = ""
+        tokenEl.style.display = "flex"
+        //填充密码
+        if (CryptoJS) {
+            const str = localStorage.getItem('kano_remembered_loginfo')
+            if (str) {
+                try {
+                    const bytes = CryptoJS.AES.decrypt(str, 'kano_secret_key_1145141919810721')
+                    const originalText = bytes.toString(CryptoJS.enc.Utf8)
+                    const [remembered_password, remembered_token] = originalText.split('<kano_CryptoJS_split>')
+                    if (remembered_password && remembered_token) {
+                        pwdEl.value = remembered_password
+                        tokenInput.value = remembered_token
+                        const loginRememberMe = document.querySelector('#loginRememberMe')
+                        if (loginRememberMe) {
+                            loginRememberMe.checked = true
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error decrypting remembered login info:', e)
+                }
+            }
+        }
+        if (pwdEl && pwdEl.value.trim() == "Wa@9w+YWRtaW4=") {
+            const loginMethodEl = document.querySelector("#login_method")
+            console.log("Admin login method detected, switch to password input")
+            if (loginMethodEl) {
+                loginMethodEl.value = "0"
+            }
+        }
         createToast(t('toast_logout'), 'green')
         showModal('#tokenModal')
     }
@@ -1596,6 +1671,11 @@ function main_func() {
     }
     initBandForm()
 
+    //网络协议栈开关
+    const networkStackSwitch = async (flag) => {
+        await executeATCommand(flag ? "AT+SFUN=4" : "AT+SFUN=5")
+    }
+
     const submitBandForm = async (e) => {
         e.preventDefault()
         if (!(await initRequestData())) {
@@ -1636,24 +1716,27 @@ function main_func() {
             ]))
             if (res[0].result == 'success' || res[1].result == 'success') {
                 createToast(t('toast_set_band_success'), 'green')
-                //切一下网
-                const netType = document.querySelector('#NET_TYPE')
-                if (netType) {
-                    const options = document.querySelectorAll('#NET_TYPE option')
-                    const curValue = netType.value
-                    //切到不同网络
-                    if (options.length) {
-                        const net = Array.from(options).find(el => el.value != curValue)
-                        if (net) {
-                            //切网
-                            createToast(t("toast_changing"))
-                            await changeNetwork({ target: { value: net.value } }, true)
-                            await new Promise(resolve => setTimeout(resolve, 800))
-                            //切回来
-                            await changeNetwork({ target: { value: curValue } })
-                        }
-                    }
-                }
+                //重启网络栈
+                await networkStackSwitch(false)
+                await wait(300)
+                await networkStackSwitch(true)
+                // const netType = document.querySelector('#NET_TYPE')
+                // if (netType) {
+                //     const options = document.querySelectorAll('#NET_TYPE option')
+                //     const curValue = netType.value
+                //     //切到不同网络
+                //     if (options.length) {
+                //         const net = Array.from(options).find(el => el.value != curValue)
+                //         if (net) {
+                //             //切网
+                //             createToast(t("toast_changing"))
+                //             await changeNetwork({ target: { value: net.value } }, true)
+                //             await new Promise(resolve => setTimeout(resolve, 800))
+                //             //切回来
+                //             await changeNetwork({ target: { value: curValue } })
+                //         }
+                //     }
+                // }
             }
             else {
                 createToast(t('toast_set_band_failed'), 'red')
@@ -1989,75 +2072,78 @@ function main_func() {
     })
 
     //流量管理逻辑
-    document.querySelector("#DataManagement").onclick = async () => {
-        if (!(await initRequestData())) {
-            createToast(t('toast_please_login'), 'red')
-            out()
-            return null
-        }
-        // 查流量使用情况
-        let res = await getDataUsage()
-        if (!res) {
-            createToast(t('toast_get_data_usage_failed'), 'red')
-            return null
-        }
-
-        res = {
-            ...res,
-            "wan_auto_clear_flow_data_switch": isNullOrUndefiend(res.wan_auto_clear_flow_data_switch) ? res.wan_auto_clear_flow_data_switch : res.flux_auto_clear_flow_data_switch,
-            "data_volume_limit_unit": isNullOrUndefiend(res.data_volume_limit_unit) ? res.data_volume_limit_unit : res.flux_data_volume_limit_unit,
-            "data_volume_limit_size": isNullOrUndefiend(res.data_volume_limit_size) ? res.data_volume_limit_size : res.flux_data_volume_limit_size,
-            "traffic_clear_date": isNullOrUndefiend(res.traffic_clear_date) ? res.traffic_clear_date : res.flux_clear_date,
-            "data_volume_alert_percent": isNullOrUndefiend(res.data_volume_alert_percent) ? res.data_volume_alert_percent : res.flux_data_volume_alert_percent,
-            "data_volume_limit_switch": isNullOrUndefiend(res.data_volume_limit_switch) ? res.data_volume_limit_switch : res.flux_data_volume_limit_switch,
-        }
-
-        // 预填充表单
-        const form = document.querySelector('#DataManagementForm')
-        if (!form) return null
-        let data_volume_limit_switch = form.querySelector('input[name="data_volume_limit_switch"]')
-        let wan_auto_clear_flow_data_switch = form.querySelector('input[name="wan_auto_clear_flow_data_switch"]')
-        let data_volume_limit_unit = form.querySelector('input[name="data_volume_limit_unit"]')
-        let traffic_clear_date = form.querySelector('input[name="traffic_clear_date"]')
-        let data_volume_alert_percent = form.querySelector('input[name="data_volume_alert_percent"]')
-        let data_volume_limit_size = form.querySelector('input[name="data_volume_limit_size"]')
-        let data_volume_limit_type = form.querySelector('select[name="data_volume_limit_type"]')
-        let data_volume_used_size = form.querySelector('input[name="data_volume_used_size"]')
-        let data_volume_used_type = form.querySelector('select[name="data_volume_used_type"]')
-
-        // (12094630728720/1024/1024)/1048576
-        let used_size_type = 1
-        const used_size = (() => {
-            const total_bytes = ((Number(res.monthly_rx_bytes) + Number(res.monthly_tx_bytes))) / Math.pow(1024, 2)
-
-            if (total_bytes < 1024) {
-                return total_bytes.toFixed(2)
-            } else if (total_bytes >= 1024 && total_bytes < Math.pow(1024, 2)) {
-                used_size_type = 1024
-                return (total_bytes / 1024).toFixed(2)
-            } else {
-                used_size_type = Math.pow(1024, 2)
-                return (total_bytes / Math.pow(1024, 2)).toFixed(2)
+    document.querySelector("#DataManagement").onclick = () => {
+        (async () => {
+            if (!(await initRequestData())) {
+                createToast(t('toast_please_login'), 'red')
+                out()
+                return null
             }
-        })()
+            // 查流量使用情况
+            let res = await getDataUsage()
+            if (!res) {
+                createToast(t('toast_get_data_usage_failed'), 'red')
+                return null
+            }
 
-        data_volume_limit_switch && (data_volume_limit_switch.checked = res.data_volume_limit_switch.toString() == '1')
-        wan_auto_clear_flow_data_switch && (wan_auto_clear_flow_data_switch.checked = res.wan_auto_clear_flow_data_switch.toString() == 'on')
-        data_volume_limit_unit && (data_volume_limit_unit.checked = res.data_volume_limit_unit.toString() == 'data')
-        traffic_clear_date && (traffic_clear_date.value = res.traffic_clear_date.toString())
-        data_volume_alert_percent && (data_volume_alert_percent.value = res.data_volume_alert_percent.toString())
-        data_volume_limit_size && (data_volume_limit_size.value = res.data_volume_limit_size?.split('_')[0].toString())
-        data_volume_limit_type && (() => {
-            const val = Number(res.data_volume_limit_size?.split('_')[1])
-            const option = data_volume_limit_type.querySelector(`option[data-value="${val}"]`)
-            option && (option.selected = true)
+            res = {
+                ...res,
+                "wan_auto_clear_flow_data_switch": isNullOrUndefiend(res.wan_auto_clear_flow_data_switch) ? res.wan_auto_clear_flow_data_switch : res.flux_auto_clear_flow_data_switch,
+                "data_volume_limit_unit": isNullOrUndefiend(res.data_volume_limit_unit) ? res.data_volume_limit_unit : res.flux_data_volume_limit_unit,
+                "data_volume_limit_size": isNullOrUndefiend(res.data_volume_limit_size) ? res.data_volume_limit_size : res.flux_data_volume_limit_size,
+                "traffic_clear_date": isNullOrUndefiend(res.traffic_clear_date) ? res.traffic_clear_date : res.flux_clear_date,
+                "data_volume_alert_percent": isNullOrUndefiend(res.data_volume_alert_percent) ? res.data_volume_alert_percent : res.flux_data_volume_alert_percent,
+                "data_volume_limit_switch": isNullOrUndefiend(res.data_volume_limit_switch) ? res.data_volume_limit_switch : res.flux_data_volume_limit_switch,
+            }
+
+            // 预填充表单
+            const form = document.querySelector('#DataManagementForm')
+            if (!form) return null
+            let data_volume_limit_switch = form.querySelector('input[name="data_volume_limit_switch"]')
+            let wan_auto_clear_flow_data_switch = form.querySelector('input[name="wan_auto_clear_flow_data_switch"]')
+            let data_volume_limit_unit = form.querySelector('input[name="data_volume_limit_unit"]')
+            let traffic_clear_date = form.querySelector('input[name="traffic_clear_date"]')
+            let data_volume_alert_percent = form.querySelector('input[name="data_volume_alert_percent"]')
+            let data_volume_limit_size = form.querySelector('input[name="data_volume_limit_size"]')
+            let data_volume_limit_type = form.querySelector('select[name="data_volume_limit_type"]')
+            let data_volume_used_size = form.querySelector('input[name="data_volume_used_size"]')
+            let data_volume_used_type = form.querySelector('select[name="data_volume_used_type"]')
+
+            // (12094630728720/1024/1024)/1048576
+            let used_size_type = 1
+            const used_size = (() => {
+                const total_bytes = ((Number(res.monthly_rx_bytes) + Number(res.monthly_tx_bytes))) / Math.pow(1024, 2)
+
+                if (total_bytes < 1024) {
+                    return total_bytes.toFixed(2)
+                } else if (total_bytes >= 1024 && total_bytes < Math.pow(1024, 2)) {
+                    used_size_type = 1024
+                    return (total_bytes / 1024).toFixed(2)
+                } else {
+                    used_size_type = Math.pow(1024, 2)
+                    return (total_bytes / Math.pow(1024, 2)).toFixed(2)
+                }
+            })()
+
+            data_volume_limit_switch && (data_volume_limit_switch.checked = res.data_volume_limit_switch.toString() == '1')
+            wan_auto_clear_flow_data_switch && (wan_auto_clear_flow_data_switch.checked = res.wan_auto_clear_flow_data_switch.toString() == 'on')
+            data_volume_limit_unit && (data_volume_limit_unit.checked = res.data_volume_limit_unit.toString() == 'data')
+            traffic_clear_date && (traffic_clear_date.value = res.traffic_clear_date.toString())
+            data_volume_alert_percent && (data_volume_alert_percent.value = res.data_volume_alert_percent.toString())
+            data_volume_limit_size && (data_volume_limit_size.value = res.data_volume_limit_size?.split('_')[0].toString())
+            data_volume_limit_type && (() => {
+                const val = Number(res.data_volume_limit_size?.split('_')[1])
+                const option = data_volume_limit_type.querySelector(`option[data-value="${val}"]`)
+                option && (option.selected = true)
+            })()
+            data_volume_used_size && (data_volume_used_size.value = used_size.toString())
+            data_volume_used_type && (() => {
+                const option = data_volume_used_type.querySelector(`option[data-value="${used_size_type.toFixed(0)}"]`)
+                option && (option.selected = true)
+            })()
+            showModal('#DataManagementModal')
         })()
-        data_volume_used_size && (data_volume_used_size.value = used_size.toString())
-        data_volume_used_type && (() => {
-            const option = data_volume_used_type.querySelector(`option[data-value="${used_size_type.toFixed(0)}"]`)
-            option && (option.selected = true)
-        })()
-        showModal('#DataManagementModal')
+        initUfiDataManagementModal();
     }
 
     //流量管理表单提交
@@ -2390,11 +2476,13 @@ function main_func() {
     }
 
     document.querySelector('#PWDINPUT').addEventListener('keydown', (event) => {
+        console.log(1, event);
         if (event.key === 'Enter') {
             onTokenConfirm()
         }
     });
     document.querySelector('#TOKEN').addEventListener('keydown', (event) => {
+        console.log(2, event);
         if (event.key === 'Enter') {
             onTokenConfirm()
         }
@@ -2413,8 +2501,8 @@ function main_func() {
 
     let initClientManagementModal = async () => {
         try {
-            const { station_list, lan_station_list, BlackMacList, BlackNameList, AclMode } = await getData(new URLSearchParams({
-                cmd: 'station_list,lan_station_list,queryDeviceAccessControlList'
+            const { station_list, lan_station_list, BlackMacList, BlackNameList, AclMode, devices } = await getData(new URLSearchParams({
+                cmd: 'station_list,lan_station_list,queryDeviceAccessControlList,hostNameList'
             }))
             const blackMacList = BlackMacList ? BlackMacList.split(';') : []
             const blackNameList = BlackNameList ? BlackNameList.split(';') : []
@@ -2426,10 +2514,18 @@ function main_func() {
             let black_list_html = ''
 
             if (station_list && station_list.length) {
-                conn_client_html += station_list.map(({ hostname, ip_addr, mac_addr }) => (`
+                conn_client_html += station_list.map(({ hostname, ip_addr, mac_addr }) => {
+                    let hostname_show = hostname
+                    if (devices) {
+                        hostname_show = devices.find(i => i.mac == mac_addr)?.hostname || hostname
+                    }
+                    return `
             <div class="card-item" style="display: flex;width: 100%;margin: 10px 0;overflow: auto;">
                 <div style="margin-right: 10px;">
-                    <p><span>${t('client_mgmt_hostname')}：</span><span onclick="copyText(event)">${hostname}</span></p>
+                    <p>
+                        <span>${t('client_mgmt_hostname')}：</span><span onclick="copyText(event)">${hostname_show}</span>
+                        <svg onclick="editHostName('${hostname_show}','${mac_addr}')" class="svg-icon" style="margin-left:10px" fill="var(--dark-text-color)" stroke="currentColor" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width=".8rem" height=".8rem"><path d="M568.888889 28.444444v113.777778H142.222222v739.555556h739.555556V455.111111h113.777778v455.111111a85.333333 85.333333 0 0 1-85.333334 85.333334H113.777778A85.333333 85.333333 0 0 1 28.444444 910.222222V113.777778A85.333333 85.333333 0 0 1 113.777778 28.444444h455.111111z" p-id="5380"></path><path d="M881.777778 398.222222m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5381"></path><path d="M475.192889 656.327111l-102.286222-4.209778-5.973334-103.537777 346.851556-347.591112a11.377778 11.377778 0 0 1 16.099555-0.056888l92.16 91.591111a11.377778 11.377778 0 0 1 0 16.156444l-346.851555 347.591111zM876.202667 238.762667l-92.16-91.648a11.377778 11.377778 0 0 1 0-16.156445L879.104 36.408889a11.377778 11.377778 0 0 1 16.042667 0l92.16 91.704889a11.377778 11.377778 0 0 1 0 16.099555l-95.004445 94.549334a11.377778 11.377778 0 0 1-16.099555 0z" p-id="5382"></path><path d="M512 28.444444m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5383"></path></svg>
+                    </p>
                     <p><span>${t('client_mgmt_mac')}：</span><span onclick="copyText(event)">${mac_addr}</span></p>
                     <p><span>${t('client_mgmt_ip')}：</span><span onclick="copyText(event)">${ip_addr}</span></p>
                     <p><span>${t('client_mgmt_conn_type')}：</span><span>${t('client_mgmt_conn_wireless')}</span></p>
@@ -2440,14 +2536,22 @@ function main_func() {
                         🚫 ${t('client_mgmt_block')}
                     </button>
                 </div>
-            </div>`)).join('')
+            </div>`}).join('')
             }
 
             if (lan_station_list && lan_station_list.length) {
-                conn_client_html += lan_station_list.map(({ hostname, ip_addr, mac_addr }) => (`
+                conn_client_html += lan_station_list.map(({ hostname, ip_addr, mac_addr }) => {
+                    let hostname_show = hostname
+                    if (devices) {
+                        hostname_show = devices.find(i => i.mac == mac_addr)?.hostname || hostname
+                    }
+                    return `
             <div class="card-item" style="display: flex;width: 100%;margin: 10px 0;overflow: auto;">
                 <div style="margin-right: 10px;">
-                    <p><span>${t('client_mgmt_hostname')}：</span><span onclick="copyText(event)">${hostname}</span></p>
+                    <p>
+                        <span>${t('client_mgmt_hostname')}：</span><span onclick="copyText(event)">${hostname_show}</span>
+                        <svg onclick="editHostName('${hostname_show}','${mac_addr}')" class="svg-icon" style="margin-left:10px" fill="var(--dark-text-color)" stroke="currentColor" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width=".8rem" height=".8rem"><path d="M568.888889 28.444444v113.777778H142.222222v739.555556h739.555556V455.111111h113.777778v455.111111a85.333333 85.333333 0 0 1-85.333334 85.333334H113.777778A85.333333 85.333333 0 0 1 28.444444 910.222222V113.777778A85.333333 85.333333 0 0 1 113.777778 28.444444h455.111111z" p-id="5380"></path><path d="M881.777778 398.222222m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5381"></path><path d="M475.192889 656.327111l-102.286222-4.209778-5.973334-103.537777 346.851556-347.591112a11.377778 11.377778 0 0 1 16.099555-0.056888l92.16 91.591111a11.377778 11.377778 0 0 1 0 16.156444l-346.851555 347.591111zM876.202667 238.762667l-92.16-91.648a11.377778 11.377778 0 0 1 0-16.156445L879.104 36.408889a11.377778 11.377778 0 0 1 16.042667 0l92.16 91.704889a11.377778 11.377778 0 0 1 0 16.099555l-95.004445 94.549334a11.377778 11.377778 0 0 1-16.099555 0z" p-id="5382"></path><path d="M512 28.444444m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5383"></path></svg>
+                    </p>
                     <p><span>${t('client_mgmt_mac')}：</span><span onclick="copyText(event)">${mac_addr}</span></p>
                     <p><span>${t('client_mgmt_ip')}：</span><span onclick="copyText(event)">${ip_addr}</span></p>
                     <p><span>${t('client_mgmt_conn_type')}：</span><span>${t('client_mgmt_conn_wired')}</span></p>
@@ -2458,7 +2562,7 @@ function main_func() {
                         🚫 ${t('client_mgmt_block')}
                     </button>
                 </div>
-            </div>`)).join('')
+            </div>`}).join('')
             }
 
             if (blackMacList.length && blackNameList.length) {
@@ -2470,7 +2574,10 @@ function main_func() {
                         return `
                     <div class="card-item" style="display: flex;width: 100%;margin: 10px 0;overflow: auto;">
                         <div style="margin-right: 10px;">
-                            <p><span>${t('client_mgmt_hostname')}：</span><span onclick="copyText(event)">${blackNameList[index] ? blackNameList[index] : t('client_mgmt_unknown')}</span></p>
+                            <p>
+                                <span>${t('client_mgmt_hostname')}：</span><span onclick="copyText(event)">${blackNameList[index] ? blackNameList[index] : t('client_mgmt_unknown')}</span>
+                                <svg onclick="editHostName('${blackNameList[index] || ''}','${item}')" class="svg-icon" style="margin-left:10px" fill="var(--dark-text-color)" stroke="currentColor" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width=".8rem" height=".8rem"><path d="M568.888889 28.444444v113.777778H142.222222v739.555556h739.555556V455.111111h113.777778v455.111111a85.333333 85.333333 0 0 1-85.333334 85.333334H113.777778A85.333333 85.333333 0 0 1 28.444444 910.222222V113.777778A85.333333 85.333333 0 0 1 113.777778 28.444444h455.111111z" p-id="5380"></path><path d="M881.777778 398.222222m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5381"></path><path d="M475.192889 656.327111l-102.286222-4.209778-5.973334-103.537777 346.851556-347.591112a11.377778 11.377778 0 0 1 16.099555-0.056888l92.16 91.591111a11.377778 11.377778 0 0 1 0 16.156444l-346.851555 347.591111zM876.202667 238.762667l-92.16-91.648a11.377778 11.377778 0 0 1 0-16.156445L879.104 36.408889a11.377778 11.377778 0 0 1 16.042667 0l92.16 91.704889a11.377778 11.377778 0 0 1 0 16.099555l-95.004445 94.549334a11.377778 11.377778 0 0 1-16.099555 0z" p-id="5382"></path><path d="M512 28.444444m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5383"></path></svg>
+                            </p>
                             <p><span>${t('client_mgmt_mac')}：</span><span onclick="copyText(event)">${item}</span></p>
                         </div>
                         <div style="flex:1;text-align: right;">
@@ -2491,6 +2598,49 @@ function main_func() {
         } catch (e) {
             console.error(e)
             createToast(t('client_mgmt_fetch_error'), 'red')
+        }
+    }
+
+    const editHostName = async (name, mac) => {
+        const { el, close } = createFixedToast('kano_edit_hostname', `
+                <div style="pointer-events:all;width:80vw;max-width:300px;">
+                <div class="title" style="margin:0" data-i18n="please_input_hostname">${t('please_input_hostname')}</div>
+                <input class="user_select_none" type="text" style="border: none;padding:6px;width:100%;margin-top:10px" disabled value="MAC: ${mac}"></input>
+                <input type="text" id="KANO_CONN_HOSTNAME" style="padding:6px;width:100%;margin:10px 0" data-i18n-placeholder="hostname" placeholder="${t("hostname")}" value="${name}"></input>
+                <div style="display:flex;gap:10px">
+                    <button id="close_kano_edit_hostname_toast_btn" style="width:100%;font-size:.64rem;margin-top:5px" data-i18n="confirm_btn">${t("confirm_btn")}</button>
+                    <button id="close_kano_edit_hostname_toast_btn1" style="width:100%;font-size:.64rem;margin-top:5px" data-i18n="cancel_btn">${t("cancel_btn")}</button>
+                </div>
+                </div>
+                `, 'red')
+        const btn = el.querySelector('#close_kano_edit_hostname_toast_btn')
+        const btn2 = el.querySelector('#close_kano_edit_hostname_toast_btn1')
+        const hostname = el.querySelector("#KANO_CONN_HOSTNAME")
+
+        if (!btn && !btn2 && !hostname) {
+            close()
+            return
+        }
+        btn2.onclick = () => {
+            close()
+        }
+        btn.onclick = async () => {
+            if (hostname.value.trim() == '') {
+                createToast(t('toast_hostname_cannot_be_empty'), 'red')
+                return
+            }
+            try {
+                const res = await seConntHostName(mac, hostname.value.trim())
+                if (res.result == 'success') {
+                    createToast(t("toast_save_success"), 'pink')
+                    initClientManagementModal()
+                } else {
+                    throw new Error(t("toast_save_failed"))
+                }
+            } catch (e) {
+                createToast(t("toast_save_failed"), 'red')
+            }
+            close()
         }
     }
 
@@ -3091,6 +3241,68 @@ function main_func() {
         }
     }
 
+    const initVoLTESwitchBtn = async () => {
+        const voLTESwitchBtn = document.querySelector('#VoLTESwitchBtn')
+        const voLTESwitchBtn1 = document.querySelector('#VoLTESwitchBtn1')
+        if (voLTESwitchBtn) {
+            try {
+                const res = await (await fetchWithTimeout(`${KANO_baseURL}/volte_status?slot=0`)).json()
+                if (res) {
+                    voLTESwitchBtn.dataset.enabled = res.enabled ? "1" : "0"
+                    voLTESwitchBtn.style.backgroundColor = res.enabled ? 'var(--dark-btn-color-active)' : ''
+                }
+            } catch (e) {
+                voLTESwitchBtn.dataset.enabled = '0'
+                voLTESwitchBtn.style.backgroundColor = ''
+                console.log('fetch volte status error', e)
+            }
+        }
+        if (voLTESwitchBtn1) {
+            try {
+                const res = await (await fetchWithTimeout(`${KANO_baseURL}/volte_status?slot=1`)).json()
+                if (res) {
+                    voLTESwitchBtn1.dataset.enabled = res.enabled ? "1" : "0"
+                    voLTESwitchBtn1.style.backgroundColor = res.enabled ? 'var(--dark-btn-color-active)' : ''
+                }
+            } catch (e) {
+                voLTESwitchBtn1.dataset.enabled = '0'
+                voLTESwitchBtn1.style.backgroundColor = ''
+                console.log('fetch volte status error', e)
+            }
+        }
+    }
+
+    const initVoNRSwitchBtn = async () => {
+        const voNRSwitchBtn = document.querySelector('#VoNRSwitchBtn')
+        const voNRSwitchBtn1 = document.querySelector('#VoNRSwitchBtn1')
+        if (voNRSwitchBtn) {
+            try {
+                const res = await (await fetchWithTimeout(`${KANO_baseURL}/vonr_status?slot=0`)).json()
+                if (res) {
+                    voNRSwitchBtn.dataset.enabled = res.enabled ? "1" : "0"
+                    voNRSwitchBtn.style.backgroundColor = res.enabled ? 'var(--dark-btn-color-active)' : ''
+                }
+            } catch (e) {
+                voNRSwitchBtn.dataset.enabled = '0'
+                voNRSwitchBtn.style.backgroundColor = ''
+                console.log('fetch vonr status error', e)
+            }
+        }
+        if (voNRSwitchBtn1) {
+            try {
+                const res = await (await fetchWithTimeout(`${KANO_baseURL}/vonr_status?slot=1`)).json()
+                if (res) {
+                    voNRSwitchBtn1.dataset.enabled = res.enabled ? "1" : "0"
+                    voNRSwitchBtn1.style.backgroundColor = res.enabled ? 'var(--dark-btn-color-active)' : ''
+                }
+            } catch (e) {
+                voNRSwitchBtn1.dataset.enabled = '0'
+                voNRSwitchBtn1.style.backgroundColor = ''
+                console.log('fetch vonr status error', e)
+            }
+        }
+    }
+
     let initATBtn = async () => {
         const el = document.querySelector('#AT')
         if (!(await initRequestData()) || !el) {
@@ -3101,6 +3313,8 @@ function main_func() {
         el.style.backgroundColor = ''
         el.onclick = () => {
             initHighRailBtn()
+            initVoLTESwitchBtn()
+            initVoNRSwitchBtn()
             showModal('#ATModal')
         }
     }
@@ -3297,6 +3511,18 @@ function main_func() {
         }
     }
 
+    const loadOfficialWebPwdContent = async () => {
+        const official_web_pwd = document.querySelector("#official_web_pwd")
+        if (!official_web_pwd) return
+        try {
+            const { pwd } = await (await fetchWithTimeout(`${KANO_baseURL}/get_official_web_password`)).json()
+            if (pwd != null && pwd != undefined) {
+                official_web_pwd.textContent = pwd
+            }
+        } catch (e) {
+            console.error("loadOfficialWebPwdContent 请求失败：", e)
+        }
+    }
     //更改密码
     initChangePassData = async () => {
         const el = document.querySelector("#CHANGEPWD")
@@ -3307,6 +3533,7 @@ function main_func() {
         }
         el.style.backgroundColor = ''
         el.onclick = async () => {
+            loadOfficialWebPwdContent()
             showModal('#changePassModal')
         }
     }
@@ -5391,7 +5618,15 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                             content: pluginContent
                         });
                     } else {
-                        msgs += `<p>${t('plugin')}:${pluginName} ${t('exists_skip')}</p>`
+                        //替换插件
+                        let index = plugins.findIndex(el => el.name === pluginName)
+                        if (index !== -1) {
+                            plugins[index] = {
+                                name: pluginName,
+                                content: pluginContent
+                            }
+                            msgs += `<p>${t('plugin_override_mod')}</p>`
+                        }
                     }
                 }
                 if (msgs) {
@@ -5412,7 +5647,14 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                         });
                         createToast(t('toast_add_success_save_to_submit'), 'pink');
                     } else {
-                        createToast(t('same_plugin'), 'pink')
+                        let index = plugins.findIndex(el => el.name === pluginName)
+                        if (index !== -1) {
+                            plugins[index] = {
+                                name: pluginName,
+                                content: str
+                            }
+                            createToast(`${t('plugin_override_mod')}`, 'pink')
+                        }
                     }
                     resolve({ msg: 'added as single plugin' });
                 }
@@ -5420,6 +5662,18 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                 renderPluginList();
             }
         })
+    }
+
+    const exportPlugin = () => {
+        try {
+            if (!currentEditPluginItem) throw Error("plugin not found")
+            const b = new Blob([currentEditPluginItem.content], { type: 'text/plain' })
+            saveAs(b, `${currentEditPluginItem.name}`)
+            createToast(t("download_ing"))
+        } catch (e) {
+            console.error(e)
+            createToast(t('download_failed'), 'red')
+        }
     }
 
     //插件导出
@@ -5446,6 +5700,8 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
     //初始化插件功能
     let sortable_plugin = null
     let plugins = []
+    let currentEditPluginItem = null
+    window.ufi_plugins = plugins
 
     const renderPluginList = () => {
         const listEl = document.getElementById('sortable-list')
@@ -5465,7 +5721,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
             const deleteBtn = document.createElement('div')
             deleteBtn.style.height = '20px'
             deleteBtn.classList.add('drag-option', 'delete-btn')
-            deleteBtn.innerHTML = `<svg width="20px" height="20px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path fill="#ffffff" d="M736 352.032L736.096 800h-0.128L288 799.968 288.032 352 736 352.032zM384 224h256v64h-256V224z m448 64h-128V202.624C704 182.048 687.232 160 640.16 160h-256.32C336.768 160 320 182.048 320 202.624V288H192a32 32 0 1 0 0 64h32V799.968C224 835.296 252.704 864 288.032 864h447.936A64.064 64.064 0 0 0 800 799.968V352h32a32 32 0 1 0 0-64z"  /><path fill="#ffffff" d="M608 690.56a32 32 0 0 0 32-32V448a32 32 0 1 0-64 0v210.56a32 32 0 0 0 32 32M416 690.56a32 32 0 0 0 32-32V448a32 32 0 1 0-64 0v210.56a32 32 0 0 0 32 32"  /></svg>`
+            deleteBtn.innerHTML = `<svg fill="var(--dark-text-color)" stroke="currentColor"  width="20px" height="20px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M736 352.032L736.096 800h-0.128L288 799.968 288.032 352 736 352.032zM384 224h256v64h-256V224z m448 64h-128V202.624C704 182.048 687.232 160 640.16 160h-256.32C336.768 160 320 182.048 320 202.624V288H192a32 32 0 1 0 0 64h32V799.968C224 835.296 252.704 864 288.032 864h447.936A64.064 64.064 0 0 0 800 799.968V352h32a32 32 0 1 0 0-64z"  /><path d="M608 690.56a32 32 0 0 0 32-32V448a32 32 0 1 0-64 0v210.56a32 32 0 0 0 32 32M416 690.56a32 32 0 0 0 32-32V448a32 32 0 1 0-64 0v210.56a32 32 0 0 0 32 32"  /></svg>`
             deleteBtn.onclick = () => {
                 plugins.splice(index, 1)
                 createToast(`${t('deleted_plugin')}：${item.name}，${t('save_to_apply')}！`)
@@ -5475,7 +5731,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
             const sortBtn = document.createElement('div')
             sortBtn.classList.add('handle', 'drag-option')
             sortBtn.style.height = '20px'
-            sortBtn.innerHTML = `<svg width="20px" height="20px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path fill="#ffffff" d="M909.3 506.3L781.7 405.6c-4.7-3.7-11.7-0.4-11.7 5.7V476H548V254h64.8c6 0 9.4-7 5.7-11.7L517.7 114.7c-2.9-3.7-8.5-3.7-11.3 0L405.6 242.3c-3.7 4.7-0.4 11.7 5.7 11.7H476v222H254v-64.8c0-6-7-9.4-11.7-5.7L114.7 506.3c-3.7 2.9-3.7 8.5 0 11.3l127.5 100.8c4.7 3.7 11.7 0.4 11.7-5.7V548h222v222h-64.8c-6 0-9.4 7-5.7 11.7l100.8 127.5c2.9 3.7 8.5 3.7 11.3 0l100.8-127.5c3.7-4.7 0.4-11.7-5.7-11.7H548V548h222v64.8c0 6 7 9.4 11.7 5.7l127.5-100.8c3.7-2.9 3.7-8.5 0.1-11.4z" /></svg>`
+            sortBtn.innerHTML = `<svg fill="var(--dark-text-color)" stroke="currentColor"  width="20px" height="20px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M909.3 506.3L781.7 405.6c-4.7-3.7-11.7-0.4-11.7 5.7V476H548V254h64.8c6 0 9.4-7 5.7-11.7L517.7 114.7c-2.9-3.7-8.5-3.7-11.3 0L405.6 242.3c-3.7 4.7-0.4 11.7 5.7 11.7H476v222H254v-64.8c0-6-7-9.4-11.7-5.7L114.7 506.3c-3.7 2.9-3.7 8.5 0 11.3l127.5 100.8c4.7 3.7 11.7 0.4 11.7-5.7V548h222v222h-64.8c-6 0-9.4 7-5.7 11.7l100.8 127.5c2.9 3.7 8.5 3.7 11.3 0l100.8-127.5c3.7-4.7 0.4-11.7-5.7-11.7H548V548h222v64.8c0 6 7 9.4 11.7 5.7l127.5-100.8c3.7-2.9 3.7-8.5 0.1-11.4z" /></svg>`
 
             const text = document.createElement('span')
             text.innerHTML = item.disabed ? `<del style="opacity:.6">${item.name}</del>` : item.name
@@ -5485,6 +5741,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                 const editSinglePlugin = document.querySelector('#editSinglePlugin')
                 if (editSinglePlugin) {
                     const currentItem = item
+                    currentEditPluginItem = item
                     document.querySelector('#currentPluginName').textContent = currentItem.name
                     showModal('#editSinglePluginModal')
                     editSinglePlugin.value = currentItem.content
@@ -5592,7 +5849,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                 // 提取插件
                 const pluginRegex = /<!--\s*\[KANO_PLUGIN_START\]\s*(.*?)\s*-->([\s\S]*?)<!--\s*\[KANO_PLUGIN_END\]\s*\1\s*-->/g;
 
-                plugins = []
+                plugins.length = 0
                 let match
                 while ((match = pluginRegex.exec(text)) !== null) {
                     const name = match[1].trim()
@@ -5979,6 +6236,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
         const items_el = document.querySelector('#plugin_store .plugin-items')
         items_el.innerHTML = '' //清空之前的内容
         items.forEach(plugin => {
+            const exsits_plugin_index = plugins.findIndex(el => el.name == plugin.name)
             const li = document.createElement('li')
             li.className = 'plugin-item'
             li.innerHTML = `
@@ -5990,7 +6248,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                                 <span>last-modified: ${new Date(plugin?.modified).toLocaleString('zh-cn')}</span>
                             </div>
                             <div class="actions">
-                                <button onclick="installPluginFromStore('${download_url}/${plugin.name}','${plugin.name}')">${t('one_click_install')}</button>
+                                <button style="background:${exsits_plugin_index === -1 ? '' : 'var(--dark-btn-color-active)'}" onclick="installPluginFromStore('${download_url}/${plugin.name}','${plugin.name}')">${exsits_plugin_index === -1 ? t('one_click_install') : t('reinstall')}</button>
                                 <button onclick="downloadUrl('${download_url}/${plugin.name}')">${t('only_download')}</button>
                             </div>
                         `
@@ -6081,7 +6339,9 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
     const plugin_store = document.querySelector('#plugin_store_btn')
     const pluginsResultRes = []
     let timer_input = null
-    plugin_store.onclick = (e) => {
+    const PLUGIN_STORE_REPO_DEFAULT = `${KANO_baseURL}/plugins_store`
+    let plugin_store_repo = PLUGIN_STORE_REPO_DEFAULT
+    const initPluginStore = (e) => {
         //隐藏插件功能模态框
         const pluginModal = document.querySelector('#PluginModal')
         pluginModal.style.display = 'none'
@@ -6148,7 +6408,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
         const total = document.querySelector('#plugin_store .total')
         //加载插件
         pluginsResultRes.length = 0
-        fetchWithTimeout(`${KANO_baseURL}/plugins_store`)
+        fetchWithTimeout(plugin_store_repo)
             .then(res => res.json())
             .then(({ res, download_url }) => {
                 const data = res.data || {}
@@ -6270,7 +6530,16 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                 console.error(err)
                 items.innerHTML = `<li style="padding:10px">${t('error_loading_plugins')}</li>`
             })
+    }
 
+    plugin_store.onclick = () => {
+        const customRepoInput = document.querySelector('#customRepoInput')
+        if (customRepoInput) {
+            customRepoInput.disabled = false
+            customRepoInput.style.opacity = 1;
+        }
+        plugin_store_repo = PLUGIN_STORE_REPO_DEFAULT
+        initPluginStore()
     }
 
     const handlePluginStoreSearchInput = (e) => {
@@ -6281,6 +6550,56 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
             }
         }
     }
+
+    const saveCustomRepo = (flag = false) => {
+        const customRepoInput = document.querySelector('#customRepoInput')
+        if (!customRepoInput) return
+        customRepoInput.disabled = false
+        customRepoInput.style.opacity = 1;
+        if (!customRepoInput.value || customRepoInput.value.trim() === "") {
+            localStorage.removeItem("kano_plugin_store_repo")
+            plugin_store_repo = PLUGIN_STORE_REPO_DEFAULT
+            initPluginStore()
+        } else {
+            let value = customRepoInput.value.trim()
+            if (flag) {
+                value = `/api/proxy/--${value}`
+            } else {
+                value = value.replaceAll("/api/proxy/--", "")
+            }
+            customRepoInput.value = value
+            plugin_store_repo = value
+            localStorage.setItem("kano_plugin_store_repo", value)
+            initPluginStore()
+        }
+        customRepoInput.disabled = true
+        customRepoInput.style.opacity = .5;
+    }
+
+    let customRepoResetTimer = null
+    let customRepoResetFlag = false
+    const resetCustomRepo = () => {
+        const customRepoInput = document.querySelector('#customRepoInput')
+        if (!customRepoInput) return
+        plugin_store_repo = PLUGIN_STORE_REPO_DEFAULT
+        if (customRepoResetFlag == true) return
+        customRepoResetFlag = true
+        clearTimeout(customRepoResetTimer)
+        setTimeout(() => {
+            customRepoResetFlag = false
+        }, 1000);
+        initPluginStore()
+        customRepoInput.disabled = false
+        customRepoInput.style.opacity = 1;
+    }
+
+    const initCustomRepoInput = () => {
+        const customRepoInput = document.querySelector('#customRepoInput')
+        if (!customRepoInput) return
+        const repo = localStorage.getItem("kano_plugin_store_repo") || ''
+        customRepoInput.value = repo
+    }
+    initCustomRepoInput()
 
     const handleForceIMEI = async () => {
         if (!await checkAdvancedFunc()) return createToast(t("need_advance_func"), 'red')
@@ -6499,49 +6818,61 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                 return `${bin} -A INPUT -p tcp --dport ${port} -j DROP`;
             };
 
-            const delCmd = (useV6) => addCmd(useV6).replace('-A', '-D');
+            const delCmd = (useV6) => {
+                const bin = useV6 ? 'ip6tables' : 'iptables';
+                return `${bin} -D INPUT -p tcp --dport ${port} -j DROP`;
+            };
 
             // 删除当前系统中的 DROP 规则
             const cleanupCmd = (useV6) => {
                 const bin = useV6 ? 'ip6tables' : 'iptables';
-                return `for table in filter nat mangle raw security; do ${bin}-save -t $table | grep -- '--dport ${port} .*DROP' | sed 's/-A/-D/' | while read line; do ${bin} $line; done; done`;
+                return `for table in filter nat mangle raw security; do ${bin}-save -t $table 2>/dev/null | grep -- '--dport ${port} .*DROP' | sed 's/-A/-D/' | while read line; do ${bin} $line 2>/dev/null; done; done`;
             };
 
+            const saveBootup = async (cmd, proto) => {
+                const line = `(${cmd} >/dev/null 2>&1 &) # UFI-TOOLS ${proto} ${port}`;
+                const shell = `grep -qxF '${line}' /sdcard/ufi_tools_boot.sh 2>/dev/null || echo '${line}' >> /sdcard/ufi_tools_boot.sh`;
+                await runShellWithRoot(shell);
+            };
+
+            const removeAllBootup = async () => {
+                await runShellWithRoot(`sed -i '/# UFI-TOOLS .* ${port}/d' /sdcard/ufi_tools_boot.sh 2>/dev/null`);
+            };
+
+            // 先清理当前系统旧规则，避免重复
             let r0 = await runShellWithRoot(cleanupCmd(false));
             if (!r0.success) return false;
+
             if (v6) {
                 let r0v6 = await runShellWithRoot(cleanupCmd(true));
                 if (!r0v6.success) return false;
             }
 
-            const saveBootup = async (cmd, proto) => {
-                const line = `${cmd} # UFI-TOOLS ${proto} ${port}`;
-                const shell = `grep -qxF '${line}' /sdcard/ufi_tools_boot.sh || echo '${line}' >> /sdcard/ufi_tools_boot.sh`;
-                await runShellWithRoot(shell);
-            };
+            // 当前系统立即生效
+            if (flag) {
+                // flag=true：放行端口
+                // 前面 cleanup 已经删除 DROP，这里不需要再 -D
+            } else {
+                // flag=false：阻止端口
+                let r1 = await runShellWithRoot(addCmd(false));
+                if (!r1.success) return false;
 
-            const removeBootup = async (proto) => {
-                const pattern = `# UFI-TOOLS ${proto} ${port}`;
-                await runShellWithRoot(`sed -i '/${pattern}/d' /sdcard/ufi_tools_boot.sh`);
-            };
-
-            const removeAllBootup = async () => {
-                await runShellWithRoot(`sed -i '/# UFI-TOOLS .* ${port}/d' /sdcard/ufi_tools_boot.sh`);
-            };
-
-            if (!isBootup) {
-                await removeAllBootup();
+                if (v6) {
+                    let r1v6 = await runShellWithRoot(addCmd(true));
+                    if (!r1v6.success) return false;
+                }
             }
 
-            if (flag) {
-                await runShellWithRoot(delCmd(false));
-                if (v6) await runShellWithRoot(delCmd(true));
-                await removeBootup('v4');
-                if (v6) await removeBootup('v6');
-            } else {
-                await runShellWithRoot(addCmd(false));
-                if (v6) await runShellWithRoot(addCmd(true));
-                if (isBootup) {
+            // 开机脚本持久化
+            await removeAllBootup();
+
+            if (isBootup) {
+                if (flag) {
+                    // 开机后放行：删除 DROP
+                    await saveBootup(delCmd(false), 'v4');
+                    if (v6) await saveBootup(delCmd(true), 'v6');
+                } else {
+                    // 开机后阻止：添加 DROP
                     await saveBootup(addCmd(false), 'v4');
                     if (v6) await saveBootup(addCmd(true), 'v6');
                 }
@@ -6585,6 +6916,23 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
             })).json()
             if (result.success) {
                 throw new Error('Failed to toggle LogCat')
+            }
+            createToast(t("toast_oprate_success"), 'green')
+        }
+        catch {
+            if (!res) createToast(t("toast_oprate_failed"), "red")
+        }
+    }
+
+    const toggleWakeLock = async (flag) => {
+        try {
+            const { result } = await (await fetchWithTimeout(`${KANO_baseURL}/set_wakelock_status`, {
+                method: "POST",
+                headers: common_headers,
+                body: JSON.stringify({ wakelock_enabled: flag ? true : false })
+            })).json()
+            if (result.success) {
+                throw new Error('Failed to set_wakelock_status')
             }
             createToast(t("toast_oprate_success"), 'green')
         }
@@ -7251,9 +7599,9 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                     <div style="margin:10px 0;display: flex;flex-direction: column;gap: 6px;max-height: 50vh;overflow: auto;font-size: .7rem;" class="inner">
                       ${res.content.content.split('\n').map(item => (item.trim() ? `<div class="kano_uploads_file_item" data-item="${item}" style="padding: 10px 10px;background: var(--dark-tag-color);border-radius: 6px;display:flex;align-items: center;">
                       <span onclick="copyText({target:{innerText:'/api/uploads/${item}'}})" style="flex:1;overflow: hidden;text-overflow: ellipsis;white-space: nowrap;">${item}</span>
-                      <button style="margin-right:6px;padding: 0;display: flex;" onclick="downloadUrl('/api/uploads/${item}','${item}')"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" t="1770319174878" viewBox="0 0 1024 1024" version="1.1" p-id="1583" width="20" height="20"><path d="M896 672c-17.066667 0-32 14.933333-32 32v128c0 6.4-4.266667 10.666667-10.666667 10.666667H170.666667c-6.4 0-10.666667-4.266667-10.666667-10.666667v-128c0-17.066667-14.933333-32-32-32s-32 14.933333-32 32v128c0 40.533333 34.133333 74.666667 74.666667 74.666667h682.666666c40.533333 0 74.666667-34.133333 74.666667-74.666667v-128c0-17.066667-14.933333-32-32-32z" fill="var(--dark-text-color)" p-id="1584"/><path d="M488.533333 727.466667c6.4 6.4 14.933333 8.533333 23.466667 8.533333s17.066667-2.133333 23.466667-8.533333l213.333333-213.333334c12.8-12.8 12.8-32 0-44.8-12.8-12.8-32-12.8-44.8 0l-157.866667 157.866667V170.666667c0-17.066667-14.933333-32-32-32s-34.133333 14.933333-34.133333 32v456.533333L322.133333 469.333333c-12.8-12.8-32-12.8-44.8 0-12.8 12.8-12.8 32 0 44.8l211.2 213.333334z" fill="var(--dark-text-color)" p-id="1585"/></svg></button>
-                      <button style="margin-right:6px;padding: 0;display: flex;" onclick="openLink('/api/uploads/${item}')"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" t="1770319810359" viewBox="0 0 1024 1024" version="1.1" p-id="3490" width="20" height="20"><path d="M942.2 486.2C847.4 286.5 704.1 186 512 186c-192.2 0-335.4 100.5-430.2 300.3-7.7 16.2-7.7 35.2 0 51.5C176.6 737.5 319.9 838 512 838c192.2 0 335.4-100.5 430.2-300.3 7.7-16.2 7.7-35 0-51.5zM512 766c-161.3 0-279.4-81.8-362.7-254C232.6 339.8 350.7 258 512 258c161.3 0 279.4 81.8 362.7 254C791.5 684.2 673.4 766 512 766z" p-id="3491" fill="var(--dark-text-color)"/><path d="M508 336c-97.2 0-176 78.8-176 176s78.8 176 176 176 176-78.8 176-176-78.8-176-176-176z m0 288c-61.9 0-112-50.1-112-112s50.1-112 112-112 112 50.1 112 112-50.1 112-112 112z" p-id="3492" fill="var(--dark-text-color)"/></svg></button>
-                      <button class="delete_file" style="padding: 0;display: flex;"><svg width="20px" height="20px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path fill="var(--dark-text-color)" d="M736 352.032L736.096 800h-0.128L288 799.968 288.032 352 736 352.032zM384 224h256v64h-256V224z m448 64h-128V202.624C704 182.048 687.232 160 640.16 160h-256.32C336.768 160 320 182.048 320 202.624V288H192a32 32 0 1 0 0 64h32V799.968C224 835.296 252.704 864 288.032 864h447.936A64.064 64.064 0 0 0 800 799.968V352h32a32 32 0 1 0 0-64z"></path><path fill="var(--dark-text-color)" d="M608 690.56a32 32 0 0 0 32-32V448a32 32 0 1 0-64 0v210.56a32 32 0 0 0 32 32M416 690.56a32 32 0 0 0 32-32V448a32 32 0 1 0-64 0v210.56a32 32 0 0 0 32 32"></path></svg></button></div>` : "")).join('')}
+                      <button style="margin-right:6px;padding: 0;display: flex;" onclick="downloadUrl('/api/uploads/${item}','${item}')"><svg fill="var(--dark-text-color)" stroke="currentColor"  xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" t="1770319174878" viewBox="0 0 1024 1024" version="1.1" p-id="1583" width="20" height="20"><path d="M896 672c-17.066667 0-32 14.933333-32 32v128c0 6.4-4.266667 10.666667-10.666667 10.666667H170.666667c-6.4 0-10.666667-4.266667-10.666667-10.666667v-128c0-17.066667-14.933333-32-32-32s-32 14.933333-32 32v128c0 40.533333 34.133333 74.666667 74.666667 74.666667h682.666666c40.533333 0 74.666667-34.133333 74.666667-74.666667v-128c0-17.066667-14.933333-32-32-32z" fill="var(--dark-text-color)" p-id="1584"/><path d="M488.533333 727.466667c6.4 6.4 14.933333 8.533333 23.466667 8.533333s17.066667-2.133333 23.466667-8.533333l213.333333-213.333334c12.8-12.8 12.8-32 0-44.8-12.8-12.8-32-12.8-44.8 0l-157.866667 157.866667V170.666667c0-17.066667-14.933333-32-32-32s-34.133333 14.933333-34.133333 32v456.533333L322.133333 469.333333c-12.8-12.8-32-12.8-44.8 0-12.8 12.8-12.8 32 0 44.8l211.2 213.333334z" fill="var(--dark-text-color)" p-id="1585"/></svg></button>
+                      <button style="margin-right:6px;padding: 0;display: flex;" onclick="openLink('/api/uploads/${item}')"><svg fill="var(--dark-text-color)" stroke="currentColor"  xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" t="1770319810359" viewBox="0 0 1024 1024" version="1.1" p-id="3490" width="20" height="20"><path d="M942.2 486.2C847.4 286.5 704.1 186 512 186c-192.2 0-335.4 100.5-430.2 300.3-7.7 16.2-7.7 35.2 0 51.5C176.6 737.5 319.9 838 512 838c192.2 0 335.4-100.5 430.2-300.3 7.7-16.2 7.7-35 0-51.5zM512 766c-161.3 0-279.4-81.8-362.7-254C232.6 339.8 350.7 258 512 258c161.3 0 279.4 81.8 362.7 254C791.5 684.2 673.4 766 512 766z" p-id="3491" fill="var(--dark-text-color)"/><path d="M508 336c-97.2 0-176 78.8-176 176s78.8 176 176 176 176-78.8 176-176-78.8-176-176-176z m0 288c-61.9 0-112-50.1-112-112s50.1-112 112-112 112 50.1 112 112-50.1 112-112 112z" p-id="3492" fill="var(--dark-text-color)"/></svg></button>
+                      <button class="delete_file" style="padding: 0;display: flex;"><svg fill="var(--dark-text-color)" stroke="currentColor"  width="20px" height="20px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path fill="var(--dark-text-color)" d="M736 352.032L736.096 800h-0.128L288 799.968 288.032 352 736 352.032zM384 224h256v64h-256V224z m448 64h-128V202.624C704 182.048 687.232 160 640.16 160h-256.32C336.768 160 320 182.048 320 202.624V288H192a32 32 0 1 0 0 64h32V799.968C224 835.296 252.704 864 288.032 864h447.936A64.064 64.064 0 0 0 800 799.968V352h32a32 32 0 1 0 0-64z"></path><path fill="var(--dark-text-color)" d="M608 690.56a32 32 0 0 0 32-32V448a32 32 0 1 0-64 0v210.56a32 32 0 0 0 32 32M416 690.56a32 32 0 0 0 32-32V448a32 32 0 1 0-64 0v210.56a32 32 0 0 0 32 32"></path></svg></button></div>` : "")).join('')}
                     </div>
                     <div style="text-align:right">
                         <button style="font-size:.64rem" id="upload_media_file_btn" data-i18n="upload_file_limit_100mb">${t('upload_file_limit_100mb')}</button>
@@ -7374,6 +7722,404 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
         md.id && showModal(md.id)
     }
 
+    //免密码登录
+    const noPassLogin = () => {
+        const method = "0"
+        const password = "Wa@9w+YWRtaW4="
+
+        //下面不用改
+        const loginMethodEl = document.querySelector("#login_method")
+        const label = document.querySelector("#token_div_label2")
+        const tokenEl = document.querySelector("#PWD_BLK")
+        const pwdEl = document.querySelector("#PWDINPUT")
+        loginMethodEl.value = method
+        pwdEl.value = password
+        label.style.display = "none"
+        tokenEl.style.display = "none"
+        createToast(t('toast_no_pass_login_fill_success'), 'green')
+    }
+
+    //切换密码显示
+    const switchPassInputShow = (e, id) => {
+        e.preventDefault()
+        const target = e.currentTarget
+        if (target != e.target) return
+        if (!id) return
+        const pwdEl = document.querySelector(id)
+        if (!pwdEl) return
+        if (pwdEl.type == "password") {
+            pwdEl.type = "text"
+            target.innerHTML = `<svg style="pointer-events: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.77 21.77 0 0 1-4.35 5.35"/><path d="M10.58 10.58A2 2 0 0 0 12 14a2 2 0 0 0 1.42-.58"/><path d="M1 1l22 22"/></svg>`
+        } else {
+            pwdEl.type = "password"
+            target.innerHTML = `<svg style="pointer-events: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" /><circle cx="12" cy="12" r="3" /></svg>`
+        }
+    }
+
+    const resetUsageModalData = () => {
+        const tbody = document.querySelector('#DataUsageHistoryBody')
+        if (!tbody) return
+        const sumEl = document.querySelector("#data_usage_history_sum")
+        const avgEl = document.querySelector("#data_usage_history_avg")
+        if (!sumEl) return
+        if (!avgEl) return
+        sumEl.textContent = "N/A"
+        avgEl.textContent = "N/A"
+        tbody.innerHTML = '<tr style="cursor: pointer;"><td colspan="2" data-i18n="no_data">' + t('no_data') + '</td></tr>'
+        //默认日期间隔10天
+        const startTimeEl = document.querySelector('#start_time_data_usage_history')
+        const endTimeEl = document.querySelector('#end_time_data_usage_history')
+        const today = new Date()
+        const start = new Date(today);
+        start.setDate(start.getDate() - 10);
+        if (startTimeEl) {
+            startTimeEl.value = formatLocalDate(start)
+        }
+        if (endTimeEl) {
+            endTimeEl.value = formatLocalDate(today)
+        }
+        updateDataHistoryChart({
+            items: []
+        })
+    }
+    const openDataUsageHistory = async () => {
+        if (!(await initRequestData())) {
+            createToast(t('toast_please_login'), 'red')
+            return null
+        }
+        resetUsageModalData()
+        doDataUsageHistorySearch()
+        showModal('#DataUsageHistoryModal')
+    }
+
+    const doDataUsageHistorySearch = async () => {
+        const startTimeEl = document.querySelector('#start_time_data_usage_history')
+        const endTimeEl = document.querySelector('#end_time_data_usage_history')
+        if (!startTimeEl || !endTimeEl) return
+        const startTime = startTimeEl.value
+        const endTime = endTimeEl.value
+
+        const tbody = document.querySelector('#DataUsageHistoryBody')
+        if (!tbody) return
+        const sumEl = document.querySelector("#data_usage_history_sum")
+        const avgEl = document.querySelector("#data_usage_history_avg")
+        if (!sumEl) return
+        if (!avgEl) return
+        sumEl.textContent = "N/A"
+        avgEl.textContent = "N/A"
+        tbody.innerHTML = '<tr style="cursor: pointer;"><td colspan="2" data-i18n="no_data">' + t('no_data') + '</td></tr>'
+
+        if (!startTime || !endTime) {
+            if (!startTime) createToast(t('please_input_start_date'), 'pink')
+            if (!endTime) createToast(t('please_input_end_date'), 'pink')
+            return
+        }
+
+        const end = new Date(endTime);
+        const start = new Date(startTime);
+        const today = new Date();
+
+        end.setHours(0, 0, 0, 0);
+        start.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        if (end > today) {
+            return createToast(t('please_input_correct_date'), 'pink')
+        }
+        if (start > end) {
+            return createToast(t('start_date_not_bigger_than_end_date'), 'pink')
+        }
+        const diffDays = Math.floor((end - start) / (24 * 60 * 60 * 1000));
+        if (diffDays > 400) {
+            return createToast(t('date_range_over_400'), 'pink');
+        }
+        tbody.innerHTML = '<tr style="cursor: pointer;"><td colspan="2"><strong class="green" style="display: flex;flex-direction: column;"><span style="font-size: 2rem;" class="spin">🌀</span><span style="font-size: .8rem;padding-top: 10px;">loading...</span></strong></td></tr>'
+        const res = await getDailyUsageRange(new Date(startTime), new Date(endTime))
+        tbody.innerHTML = ''
+        if (res.length == 0) {
+            tbody.innerHTML = '<tr style="cursor: pointer;"><td colspan="2" data-i18n="no_data">' + t('no_data') + '</td></tr>'
+            return
+        }
+        let sumBytes = 0
+        res.forEach(item => {
+            let tr = document.createElement('tr')
+            let dateTd = document.createElement('td')
+            let timeTd = document.createElement('td')
+            dateTd.textContent = item.date
+            timeTd.textContent = item.usage == 0 ? "0 B" : formatBytes(item.usage)
+            tr.appendChild(dateTd)
+            tr.appendChild(timeTd)
+            tbody.appendChild(tr)
+            sumBytes += parseInt(item.usage)
+        })
+
+        let avgBytes = sumBytes / res.length
+
+        sumEl.textContent = sumBytes == 0 ? '0 B' : formatBytes(sumBytes)
+        avgEl.textContent = avgBytes == 0 ? '0 B' : formatBytes(avgBytes)
+
+        //更新图表
+        updateDataHistoryChart({
+            items: res, sum: sumBytes, avg: avgBytes
+        })
+    }
+
+    const pluginSubmitBtn = document.querySelector('#pluginSubmitBtn')
+    if (pluginSubmitBtn) {
+        pluginSubmitBtn.onclick = () => {
+            createToast(t('plugin_post_request_toast'), '', 8000)
+            const to = "plugin@kano.ink";
+            const subject = t('plugin_post_request');
+            window.location.href =
+                `mailto:${to}?subject=${encodeURIComponent(subject)}`;
+        }
+    }
+
+    const handleVoLTE = async () => {
+        try {
+            const voLTESwitchBtn = document.querySelector('#VoLTESwitchBtn')
+            if (!voLTESwitchBtn) return
+
+            const res = await (await fetchWithTimeout(`${KANO_baseURL}/volte_status?slot=0`, {
+                method: "POST",
+                body: JSON.stringify({ enabled: voLTESwitchBtn.dataset.enabled == "1" ? "0" : "1" }),
+                headers: common_headers
+            })).json()
+            if (res.result == "success") {
+                createToast(t('toast_oprate_success'), 'green')
+                initVoLTESwitchBtn()
+            } else {
+                createToast(t('toast_oprate_failed'), 'red')
+            }
+        } catch (e) {
+            createToast(t('toast_oprate_failed') + e, 'red')
+        }
+    }
+
+    const handleVoLTE1 = async () => {
+        try {
+            const voLTESwitchBtn1 = document.querySelector('#VoLTESwitchBtn1')
+            if (!voLTESwitchBtn1) return
+
+            const res = await (await fetchWithTimeout(`${KANO_baseURL}/volte_status?slot=1`, {
+                method: "POST",
+                body: JSON.stringify({ enabled: voLTESwitchBtn1.dataset.enabled == "1" ? "0" : "1" }),
+                headers: common_headers
+            })).json()
+            if (res.result == "success") {
+                createToast(t('toast_oprate_success'), 'green')
+                initVoLTESwitchBtn()
+            } else {
+                createToast(t('toast_oprate_failed'), 'red')
+            }
+        } catch (e) {
+            createToast(t('toast_oprate_failed') + e, 'red')
+        }
+    }
+
+    const handleVoNR = async () => {
+        try {
+            const voNRSwitchBtn = document.querySelector('#VoNRSwitchBtn')
+            if (!voNRSwitchBtn) return
+
+            const res = await (await fetchWithTimeout(`${KANO_baseURL}/vonr_status?slot=0`, {
+                method: "POST",
+                body: JSON.stringify({ enabled: voNRSwitchBtn.dataset.enabled == "1" ? "0" : "1" }),
+                headers: common_headers
+            })).json()
+            if (res.result == "success") {
+                createToast(t('toast_oprate_success'), 'green')
+                initVoNRSwitchBtn()
+            } else {
+                createToast(t('toast_oprate_failed'), 'red')
+            }
+        } catch (e) {
+            createToast(t('toast_oprate_failed') + e, 'red')
+        }
+    }
+
+    const handleVoNR1 = async () => {
+        try {
+            const voNRSwitchBtn1 = document.querySelector('#VoNRSwitchBtn1')
+            if (!voNRSwitchBtn1) return
+
+            const res = await (await fetchWithTimeout(`${KANO_baseURL}/vonr_status?slot=1`, {
+                method: "POST",
+                body: JSON.stringify({ enabled: voNRSwitchBtn1.dataset.enabled == "1" ? "0" : "1" }),
+                headers: common_headers
+            })).json()
+            if (res.result == "success") {
+                createToast(t('toast_oprate_success'), 'green')
+                initVoNRSwitchBtn()
+            } else {
+                createToast(t('toast_oprate_failed'), 'red')
+            }
+        } catch (e) {
+            createToast(t('toast_oprate_failed') + e, 'red')
+        }
+    }
+
+    //切换流量管理
+    const switchDataMgrMethod = (method) => {
+        const dataManagementForm = document.querySelector('#DataManagementForm')
+        const uFIDataManagementForm = document.querySelector('#UFIDataManagementForm')
+        switch (method.toLowerCase()) {
+            case 'official':
+                dataManagementForm.style.display = 'block'
+                uFIDataManagementForm.style.display = 'none'
+                break
+            case 'ufi':
+                dataManagementForm.style.display = 'none'
+                uFIDataManagementForm.style.display = 'block'
+                break
+                break
+        }
+        return method.toLowerCase()
+    }
+
+    //切换流量管理tab
+    const switchDataMgrMethodTab = (e) => {
+        const target = e.target
+        if (target.tagName != 'BUTTON') return
+        const children = target.parentNode?.children
+        if (!children) return
+        Array.from(children).forEach((item) => {
+            if (item != target) {
+                item.classList.remove('active')
+            }
+        })
+        target.classList.add('active')
+        const method = target.dataset.method
+        switchDataMgrMethod(method)
+    }
+
+
+
+    //UFI流量管理逻辑
+    const initUfiDataManagementModal = async () => {
+        if (!(await initRequestData())) {
+            createToast(t('toast_please_login'), 'red')
+            out()
+            return null
+        }
+
+        const res = await (await fetchWithTimeout(`${KANO_baseURL}/get_data_limit`)).json()
+        if (!res) {
+            createToast(t('toast_get_data_usage_failed'), 'red')
+            return null
+        }
+
+        const form = document.querySelector('#UFIDataManagementForm')
+        if (!form) return null
+
+        const data_flow_limit_enabled = form.querySelector('input[name="data_flow_limit_enabled"]')
+        const data_flow_max_limit = form.querySelector('input[name="data_flow_max_limit"]')
+        const data_limit_status_forward_enabled = form.querySelector('input[name="data_limit_status_forward_enabled"]')
+
+        const data_flow_max_limit_type = form.querySelector('select[name="data_flow_max_limit_type"]')
+
+        if (data_limit_status_forward_enabled) data_limit_status_forward_enabled.checked = res.data_limit_status_forward_enabled == "1"
+
+        const bytes = Number(res.data_flow_max_limit || 0)
+
+        if (bytes <= 0) {
+            data_flow_max_limit.value = "0"
+            data_flow_max_limit_type.value = "1024"
+        } else if (bytes % (1024 ** 4) === 0) {
+            data_flow_max_limit.value = String(bytes / (1024 ** 4))
+            data_flow_max_limit_type.value = "1048576"
+        } else if (bytes % (1024 ** 3) === 0) {
+            data_flow_max_limit.value = String(bytes / (1024 ** 3))
+            data_flow_max_limit_type.value = "1024"
+        } else {
+            data_flow_max_limit.value = String(Math.floor(bytes / (1024 ** 2)))
+            data_flow_max_limit_type.value = "1"
+        }
+
+
+        data_flow_limit_enabled.checked =
+            res.data_flow_limit_enabled === true ||
+            res.data_flow_limit_enabled === "1" ||
+            res.data_flow_limit_enabled === 1
+
+        const flowType = res.data_flow_check_daily_or_monthly || "monthly"
+        const flowTypeRadio = form.querySelector(
+            `input[name="data_flow_check_daily_or_monthly"][value="${flowType}"]`
+        )
+        if (flowTypeRadio) flowTypeRadio.checked = true
+
+        const reference = res.data_check_reference == "android" ? "ufi" : "official" || "official"
+        const referenceRadio = form.querySelector(
+            `input[name="data_check_reference"][value="${reference}"]`
+        )
+        if (referenceRadio) referenceRadio.checked = true
+    }
+
+    //UFI流量管理表单提交
+    let handleUFIDataManagementFormSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            let form_data = {
+                "data_flow_limit_enabled": "0",
+                "data_flow_max_limit": -1,
+                "data_flow_check_daily_or_monthly": "monthly",
+                "data_check_reference": "default",
+                "data_limit_status_forward_enabled": "0"
+            }
+
+            const form = e.target; // 获取表单
+            const formData = new FormData(form);
+
+            const data_flow_max_limit_type = formData.get("data_flow_max_limit_type")
+
+            for (const [key, value] of formData.entries()) {
+                switch (key) {
+                    case 'data_flow_limit_enabled':
+                        form_data[key] = value.trim() == 'on' ? '1' : '0'
+                        break;
+                    case 'data_check_reference':
+                        form_data[key] = value.trim() == 'official' ? 'default' : 'android'
+                        break;
+                    case 'data_flow_check_daily_or_monthly':
+                        form_data[key] = value.trim() == 'monthly' ? 'monthly' : 'daily'
+                        break;
+                    case 'data_limit_status_forward_enabled':
+                        form_data[key] = value.trim() == 'on' ? '1' : '0'
+                        break;
+                    case 'data_flow_max_limit':
+                        if (isNaN(Number(value.trim()))) {
+                            createToast(t('data_flow_max_limit_must_be_number'), 'red')
+                            return
+                        }
+                        if (Number(value.trim()) <= 0) {
+                            createToast(t('data_flow_max_limit_must_greater_than_0'), 'red')
+                            return
+                        }
+                        form_data[key] = (Number(value.trim()) * Number(data_flow_max_limit_type) * Math.pow(1024, 2)).toFixed(3)
+                        break;
+                }
+            }
+
+            try {
+                const res = await (await fetchWithTimeout(`${KANO_baseURL}/set_data_limit`, {
+                    method: "POST",
+                    body: JSON.stringify(form_data),
+                    headers: common_headers
+                })).json()
+
+                if (res.result == 'success') {
+                    createToast(t('toast_set_success'), 'green')
+                    closeModal('#DataManagementModal')
+                } else {
+                    throw t('toast_set_failed')
+                }
+            } catch (e) {
+                createToast(e.message, 'red')
+            }
+        } catch (e) {
+            createToast(e.message, 'red')
+        }
+    };
+
     //官方后台貌似对PIN超出次数的判定有问题，PIN次数用完后提示输入PUK，此时换卡也不会变更状态，用户只能恢复出厂设置，所以此功能不会继续实现
     // let simCardPinDisabled = false
     // const initSimCardPin = async () => {
@@ -7476,6 +8222,21 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
     // initSimCardPin()
     //挂载方法到window
     const methods = {
+        exportPlugin,
+        handleUFIDataManagementFormSubmit,
+        switchDataMgrMethodTab,
+        handleVoLTE,
+        handleVoNR,
+        handleVoLTE1,
+        handleVoNR1,
+        saveCustomRepo,
+        resetCustomRepo,
+        resetUsageModalData,
+        openDataUsageHistory,
+        doDataUsageHistorySearch,
+        editHostName,
+        switchPassInputShow,
+        noPassLogin,
         showNetConnInfoModal,
         handleOpenUploadFilesList,
         clearAPPUploadData,
@@ -7483,6 +8244,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
         onCloseChangeTokenForm,
         handleChangeToken,
         toggleLogCat,
+        toggleWakeLock,
         changeResServer,
         onChangeIsAutoFrofile,
         onViewAPNProfile,

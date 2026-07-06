@@ -85,6 +85,8 @@
                                 <button id="SMS" class="btn" data-i18n="sms">短信收发</button>
                             </div>
                             <button id="DataManagement" class="btn" data-i18n="data_mgmt">流量管理</button>
+                            <button id="DataUsageHistory" onclick="openDataUsageHistory()" class="btn"
+                                data-i18n="data_usage_history_btn">流量历史</button>
                             <button id="SpeedTestBtn" class="btn" data-i18n="speed_test"
                                 onclick="showModal('#speedTestModal')">内网测速</button>
                             <button id="CellularSpeedTestBtn" class="btn" data-i18n="cellular_speed_test"
@@ -532,21 +534,52 @@
                     <form class="content"
                         style="padding: 0px 4px 0 4px;display: flex;flex-direction: column;align-items: center;">
                         <input type="text" name="username" autocomplete="username" style="display: none;">
-                        <select style="width: 100%;margin-bottom: 10px;" class="select" name="" value="1"
-                            id="login_method">
-                            <option value="1" data-i18n="login_method_1">登录方式1</option>
-                            <option value="0" data-i18n="login_method_2">登录方式2</option>
-                        </select>
+                        <div style="display: flex;width: 100%;">
+                            <select style="width: 100%;margin-bottom: 10px;" class="select" name="" value="1"
+                                id="login_method">
+                                <option value="1" data-i18n="login_method_1">登录方式1</option>
+                                <option value="0" data-i18n="login_method_2">登录方式2</option>
+                            </select>
+                            <button type="button" data-i18n="no_pass_login_btn"
+                                onclick="event.preventDefault();noPassLogin()"
+                                style="flex-shrink: 0;margin: 4px 2px;">免密码登录</button>
+                        </div>
                         <div id="TOKEN_LABEL" style="align-self: start;margin-bottom: 10px;font-size: .85rem;"
                             data-i18n="token_div_1">UFI 口令：</div>
-                        <input name="backend_password" autocomplete="current-password" id="TOKEN" type="password"
-                            data-i18n-placeholder="token_placeholder_token" placeholder="口令(UFI-TOOLS后台应用中查看)"
-                            style="width: 100%;text-indent: .5em;margin:0 4px;margin-bottom: 10px;height: 30px;">
-                        <div style="align-self: start;margin-bottom: 10px;font-size: .85rem;" data-i18n="token_div_2">
+                        <div style="display: flex;width: 100%;margin-bottom: 10px;gap: 4px;">
+                            <input name="backend_password" autocomplete="current-password" id="TOKEN" type="password"
+                                data-i18n-placeholder="token_placeholder_token" placeholder="口令(UFI-TOOLS后台应用中查看)"
+                                style="width: 100%;text-indent: .5em;height: 30px;">
+                            <button type="button" onclick="switchPassInputShow(event,'#TOKEN')"
+                                style="background: none;;flex-shrink: 0;display: flex;align-items: center;justify-content: center;"><svg
+                                    style="pointer-events: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                    width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg></button>
+                        </div>
+                        <div style="align-self: start;margin-bottom: 10px;font-size: .85rem;" id="token_div_label2"
+                            data-i18n="token_div_2">
                             某兴后台密码：</div>
-                        <input name="web_password" autocomplete="new-password" id="PWDINPUT" type="password"
-                            data-i18n-placeholder="token_placeholder_pwd" placeholder="官方后台的管理密码"
-                            style="width: 100%;text-indent: .5em; margin:0 4px;margin-bottom: 20px;height: 30px;">
+                        <div style="display: flex;width: 100%;margin-bottom: 10px;gap: 4px;" id="PWD_BLK">
+                            <input name="web_password" autocomplete="new-password" id="PWDINPUT" type="password"
+                                data-i18n-placeholder="token_placeholder_pwd" placeholder="官方后台的管理密码"
+                                style="width: 100%;text-indent: .5em; height: 30px;">
+                            <button type="button" onclick="switchPassInputShow(event,'#PWDINPUT')"
+                                style="background: none;flex-shrink: 0;display: flex;align-items: center;justify-content: center;"><svg
+                                    style="pointer-events: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                    width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg></button>
+                        </div>
+                        <label class="user_select_none"
+                            style="align-self: start;margin-bottom: 10px;margin-top: 2px;font-size: .8rem;display: flex;align-items: center;justify-content: center;">
+                            <span data-i18n="remember-me">记住我</span>
+                            <input type="checkbox" style="margin: 0 6px;" id="loginRememberMe">
+                        </label>
                     </form>
                     <div class="btn" style="text-align: right;">
                         <button data-i18n="confirm_btn" onclick="onTokenConfirm()">确认</button>
@@ -718,6 +751,14 @@
             <div class="mask" id="DataManagementModal" style="display: none">
                 <div class="modal">
                     <div class="title" data-i18n="data_manage_modal_title">流量管理</div>
+                    <!-- tab -->
+                    <div class="tabs" onclick="switchDataMgrMethodTab(event)"
+                        style="width: 100%;display: flex;margin-top: 10px;gap: 10px;">
+                        <button data-method="official" id="officialDataManagementTabBtn" style="flex: 1;"
+                            class="tab-btn active" data-i18n="official_data_management">官方流量管理</button>
+                        <button data-method="ufi" id="ufiDataManagementTabBtn" style="flex: 1;" class="tab-btn"
+                            data-i18n="ufi_data_management">UFI流量管理</button>
+                    </div>
                     <form onsubmit="handleDataManagementFormSubmit(event)" id="DataManagementForm">
                         <div class="title"
                             style="margin-top:10px;font-size:.7rem;flex-direction: column;align-items: start;gap: 0;">
@@ -769,8 +810,9 @@
                                     <input style="flex:1;height: 100%;width: 100%;" type="text"
                                         name="data_volume_limit_size" value="100" placeholder="流量套餐"
                                         data-i18n-placeholder="data_manage_plan_total_placeholder">
-                                    <select class="select" style="padding: 4px; margin-left: 6px;" value="1024"
-                                        name="data_volume_limit_type">
+                                    <select class="select"
+                                        style="padding: 4px; margin-left: 6px;margin: 0 !important;margin-left: 4px !important;"
+                                        value="1024" name="data_volume_limit_type">
                                         <option data-value="1" value="1">MB</option>
                                         <option data-value="1024" value="1024">GB</option>
                                         <option data-value="1048576" value="1048576">TB</option>
@@ -783,8 +825,9 @@
                                     <input style="flex:1;height: 100%;width: 100%;" type="text"
                                         name="data_volume_used_size" value="114" placeholder="已用流量"
                                         data-i18n-placeholder="data_manage_plan_used_placeholder">
-                                    <select class="select" style="padding: 4px; margin-left: 6px;" value="1024"
-                                        name="data_volume_used_type">
+                                    <select class="select"
+                                        style="padding: 4px; margin-left: 6px;margin: 0 !important;margin-left: 4px !important;"
+                                        value="1024" name="data_volume_used_type">
                                         <option data-value="1" value="1">MB</option>
                                         <option data-value="1024" value="1024">GB</option>
                                         <option data-value="1048576" value="1048576">TB</option>
@@ -798,6 +841,130 @@
                                 data-i18n="close_btn">关闭</button>
                         </div>
                     </form>
+                    <form onsubmit="handleUFIDataManagementFormSubmit(event)" id="UFIDataManagementForm"
+                        style="display: none;">
+                        <div class="title"
+                            style="margin-top:10px;font-size:.7rem;flex-direction: column;align-items: start;gap: 0;">
+                            <!-- <span data-i18n="">提示：请正确设置提醒阈值</span> -->
+                            <!-- <span data-i18n="">当流量到达设置的阈值百分比时机器会红灯闪烁提示您流量不足</span> -->
+
+                        </div>
+                        <div class="content" id="UFI_DATA_MANAGE_LIST"
+                            style="overflow-y: scroll;padding: 15px;padding-top:0;width: 66vw;max-width: 400px;">
+                            <div class="item">
+                                <label style="display: flex;align-items: center;">
+                                    <span data-i18n="enable_ufi_data_management">启用UFI流量管理？</span>
+                                    <input type="checkbox" name="data_flow_limit_enabled">
+                                </label>
+                            </div>
+                            <div class="item" style="display: flex;gap: 10px;margin: 10px 0;">
+                                <span style="font-size: 14px;" data-i18n="count_method">统计方式：</span>
+                                <label style="display: flex;align-items: center;">
+                                    <span style="margin-right: 6px;" data-i18n="with_daily_flow">按日</span>
+                                    <input style="margin: 0;" type="radio" value="daily"
+                                        name="data_flow_check_daily_or_monthly">
+
+                                </label>
+                                <label style="display: flex;align-items: center;">
+                                    <span style="margin-right: 6px;" data-i18n="with_monthly_flow">按月</span>
+                                    <input style="margin: 0;" type="radio" value="monthly"
+                                        name="data_flow_check_daily_or_monthly">
+                                </label>
+                            </div>
+                            <div class="item" style="display: flex;gap: 10px;margin: 10px 0;">
+                                <span style="font-size: 14px;" data-i18n="data_ref">流量参考：</span>
+                                <label style="display: flex;align-items: center;">
+                                    <span style="margin-right: 6px;" data-i18n="official_back">官方后台</span>
+                                    <input style="margin: 0;" type="radio" value="official" name="data_check_reference">
+
+                                </label>
+                                <label style="display: flex;align-items: center;">
+                                    <span style="margin-right: 6px;" data-i18n="ufi_back">UFI后台</span>
+                                    <input style="margin: 0;" type="radio" value="ufi" name="data_check_reference">
+                                </label>
+                            </div>
+                            <div class="item">
+                                <div style="display: flex;align-items: center;">
+                                    <span data-i18n="disconnect_network_data_value">断网流量：</span>
+                                    <input style="flex:1;height: 100%;width: 100%;margin-left: 10px;" type="text"
+                                        name="data_flow_max_limit" value="0">
+                                    <select class="select"
+                                        style="padding: 4px; margin-left: 6px;margin: 0 !important;margin-left: 4px !important;"
+                                        value="1024" name="data_flow_max_limit_type">
+                                        <option data-value="1" value="1">MB</option>
+                                        <option data-value="1024" value="1024">GB</option>
+                                        <option data-value="1048576" value="1048576">TB</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="item">
+                                <label style="display: flex;align-items: center;">
+                                    <span data-i18n="data_limit_status_forward_notify">断网时通知(需开启短信转发)？</span>
+                                    <input type="checkbox" name="data_limit_status_forward_enabled">
+                                </label>
+                            </div>
+                        </div>
+                        <div class="btn" style="text-align: right;">
+                            <button type="submit" data-i18n="submit_btn">提交</button>
+                            <button type="button" onclick="closeModal('#DataManagementModal')"
+                                data-i18n="close_btn">关闭</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <!-- 流量历史模态框 -->
+            <div class="modal" id="DataUsageHistoryModal" style="display: none">
+                <div class="title" data-i18n="data_usage_status">流量使用情况</div>
+
+                <div class="content"
+                    style="max-height: unset;font-size: .7rem;overflow-y: scroll;padding: 15px 0px; width: 80vw; max-width: 600px;">
+                    <div style="display: flex;flex-direction: column;justify-content: center;gap: 10px;">
+                        <div style="display: flex;gap: 6px;align-items: center;">
+                            <span style="flex-shrink: 0;" data-i18n="start_date">起始日期</span>:
+                            <input id="start_time_data_usage_history" class="date-time-picker" type="date"
+                                style="width: 100%;box-sizing: border-box;" />
+                        </div>
+                        <div style="display: flex;gap: 6px;align-items: center">
+                            <span style="flex-shrink: 0;" data-i18n="end_date">结束日期</span>:
+                            <input id="end_time_data_usage_history" class="date-time-picker" type="date"
+                                style="width: 100%;box-sizing: border-box;" />
+                        </div>
+                        <div style="display: flex;gap: 10px;">
+                            <button style="width: 100%;" onclick="doDataUsageHistorySearch()"
+                                data-i18n="query">查询</button>
+                            <button style="width: 100%;" onclick="resetUsageModalData()"
+                                data-i18n="plugin_search_reset_btn">重置</button>
+                        </div>
+                    </div>
+                    <div style="display: flex;gap: 10px;margin-top: 10px;justify-content: center;font-size: .8rem;">
+                        <span style="font-weight: normal;"><span data-i18n="total_usage">总用量</span>：<span
+                                style="font-weight: bold;" id="data_usage_history_sum">N/A</span></span>
+                        <span style="font-weight: normal;"><span data-i18n="avg_usage">日均使用</span>：<span
+                                style="font-weight: bold;" id="data_usage_history_avg">N/A</span></span>
+                    </div>
+                    <div class="chart" style="padding: 0;margin: 0;box-sizing: border-box;width: 100%;height: 100px;">
+                        <canvas id="kanoDataHistoryChart"></canvas>
+                    </div>
+                    <div style="max-height: 250px;overflow: auto;margin-top: 0;">
+                        <table class="nice-table" style="background: none;">
+                            <thead class="no-blur">
+                                <tr>
+                                    <th data-i18n="date_data">日期</th>
+                                    <th data-i18n="usage_data">用量</th>
+                                </tr>
+                            </thead>
+                            <tbody class="no-blur" id="DataUsageHistoryBody">
+                                <tr style="cursor: pointer;">
+                                    <td colspan="2" data-i18n="no_data">暂无数据</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="btn" style="text-align: right;">
+                    <button type="button" onclick="closeModal('#DataUsageHistoryModal')"
+                        data-i18n="close_btn">关闭</button>
                 </div>
             </div>
             <!-- WIFI设置模态框 -->
@@ -1235,17 +1402,30 @@
                     </div>
                 </div>
             </div>
-            <!-- 插件市场模态框 -->
+            <!-- 插件商店模态框 -->
             <div id="plugin_store" class="mask" style="display: none">
                 <div class="modal"
                     style="backdrop-filter: none;-webkit-backdrop-filter: none;overflow: visible;width: 90%;max-width: 500px; display: flex;flex-direction: column;">
                     <div class="title" style="margin-bottom: 10px;"><span data-i18n="plugin_store">插件商店</span> - <span
-                            class="total"></span></div>
+                            class="total" style="flex: 1;"></span> <button id="pluginSubmitBtn"
+                            style="box-sizing: border-box" class="btn"
+                            data-i18n="plugin_post_request_toast_title">投稿插件</button></div>
                     <div class="title" style="display: block;font-size: .7rem;font-style: italic;margin-bottom: 10px;">
                         <span data-i18n="plugin_store_tip">插件商店提供了更多的插件功能，您可以在这里下载和安装。</span><br>
                         <span data-i18n="plugin_store_tip1"
                             style="color: rgb(255, 162, 0);">请注意，安装插件可能会影响设备性能和稳定性，请谨慎选择。</span><br>
                         <span data-i18n="plugin_store_tip2">有些插件需要开启高级功能才可以使用。</span>
+                    </div>
+                    <div id="switchRepoBox" style="margin-bottom: 10px;display: flex;gap: 10px;">
+                        <input type="text" style="flex: 1;width: 100%;box-sizing: border-box;padding: 6px;"
+                            placeholder="自定义插件源地址" data-i18n-placeholder="custom_plugin_repo" id="customRepoInput"
+                            style="padding: 4px; margin-left: 10px;">
+                        <button style="width: fit-content;min-width: 50px;" data-i18n="plugin_search_reset_btn"
+                            onclick="resetCustomRepo()">重置</button>
+                        <button style="width: fit-content;min-width: 50px;" data-i18n="plugin_set_repo_save"
+                            onclick="saveCustomRepo()">加载</button>
+                        <button style="width: fit-content;min-width: 50px;" onclick="saveCustomRepo(true)"><span
+                                data-i18n="plugin_set_repo_save">加载</span> (proxy)</button>
                     </div>
                     <div class="searchBox">
                         <div class="searchInput">
@@ -1283,6 +1463,7 @@
                     <div class="title" style="display: flex;justify-content: space-between;margin-bottom: 4px;">
                         <span data-i18n="edit_plugin">编辑插件</span>
                         <div>
+                            <button data-i18n="export" onclick="exportPlugin()">导出</button>
                             <button data-i18n="off" onclick="disablePlugin()">禁用</button>
                             <button data-i18n="on" onclick="enablePlugin()">启用</button>
                         </div>
@@ -1355,7 +1536,6 @@
                                 <button onclick="event.preventDefault();setPort(false)"
                                     data-i18n="deny_firewall">阻止</button>
                             </div>
-                            <hr style="background-color: pink;" />
                             <div style="display: flex;gap: 10px;margin: 10px 0;">
                                 <button style="width: 100%;" onclick="event.preventDefault();toggleTTYD(true)"
                                     data-i18n="enable_ttyd_port">启用TTYD端口</button>
@@ -1368,11 +1548,18 @@
                                 <button style="width: 100%;" onclick="event.preventDefault();toggleADBIP(false)"
                                     data-i18n="disable_adb_tcpip_port">禁用无线ADB端口</button>
                             </div>
+                            <hr style="background-color: pink;" />
                             <div style="display: flex;gap: 10px;margin: 10px 0;">
                                 <button style="width: 100%;" onclick="event.preventDefault();toggleLogCat(true)"
                                     data-i18n="enable_log">启用Log</button>
                                 <button style="width: 100%;" onclick="event.preventDefault();toggleLogCat(false)"
                                     data-i18n="disable_log">禁用Log</button>
+                            </div>
+                            <div style="display: flex;gap: 10px;margin: 10px 0;">
+                                <button style="width: 100%;" onclick="event.preventDefault();toggleWakeLock(true)"
+                                    data-i18n="wake_lock_enabled">启用唤醒锁</button>
+                                <button style="width: 100%;" onclick="event.preventDefault();toggleWakeLock(false)"
+                                    data-i18n="wake_lock_disabled">禁用唤醒锁</button>
                             </div>
                             <p style="display: flex;flex-wrap: nowrap;align-items: center;gap: 4px;">
                                 <span data-i18n="ttyd_port">TTYD 端口
@@ -1465,6 +1652,14 @@
                                     <button class="btn" style="margin-top: 6px;"
                                         onclick="disableButtonWhenExecuteFunc(event,()=>handleAT('AT+CIMI'))"
                                         data-i18n="at_imsi">IMSI</button>
+                                    <button class="btn" id="VoLTESwitchBtn" style="margin-top: 6px;"
+                                        onclick="disableButtonWhenExecuteFunc(event,()=>handleVoLTE())">VoLTE(slot0)</button>
+                                    <button class="btn" id="VoNRSwitchBtn" style="margin-top: 6px;"
+                                        onclick="disableButtonWhenExecuteFunc(event,()=>handleVoNR())">VoNR(slot0)</button>
+                                    <button class="btn" id="VoLTESwitchBtn1" style="margin-top: 6px;"
+                                        onclick="disableButtonWhenExecuteFunc(event,()=>handleVoLTE1())">VoLTE(slot1)</button>
+                                    <button class="btn" id="VoNRSwitchBtn1" style="margin-top: 6px;"
+                                        onclick="disableButtonWhenExecuteFunc(event,()=>handleVoNR1())">VoNR(slot1)</button>
                                     <button class="btn" style="margin-top: 6px;" id="highRailModeBtn"
                                         onclick="disableButtonWhenExecuteFunc(event,()=>handleHighRailMode(event))"
                                         data-i18n="at_high_rail_mode">高铁模式</button>
@@ -1557,9 +1752,14 @@
                 </div>
             </div>
             <!-- 更改密码模态框 -->
-            <div class="mask" id="changePassModal" style="display: none">
-                <div class="modal">
+            <div class="mask" id="changePassModal" style="display: none;">
+                <div class="modal" style="max-width: 500px;">
                     <div class="title" data-i18n="change_password_title">更改密码(某兴WEB密码)</div>
+                    <div class="title" style="display: block;font-size: .7rem;margin-top: 10px;line-height: 20px;">
+                        <span
+                            data-i18n="change_pass_tip1">请务必使用UFI-TOOLS后台网页更改官方后台的密码，请不要直接在官方后台内更改密码，否则会导致后台记录密码与官方后台密码不一致，造成UFI-TOOLS部分功能（如定时任务）失效！</span><br />
+                        <span data-i18n="change_pass_tip2">当前UFI-TOOLS保存的密码为：</span>&nbsp;<span id="official_web_pwd"></span>
+                    </div>
                     <form onsubmit="handleChangePassword(event)" id="changePassForm">
                         <input type="text" autocomplete="username" name="username" value="admin" style="display: none;">
                         <div class="content" style="overflow-y: scroll; padding: 15px; width: 66vw; max-width: 400px;">
@@ -1567,7 +1767,7 @@
                                 <label style="display: flex; align-items: center;">
                                     <span style="flex: 1;" data-i18n="old_password">旧的密码：</span>
                                     <input style="flex: 1;padding: 4px 6px;width: 100%;" name="oldPassword"
-                                        type="password" placeholder="旧密码" autocomplete="current-password"
+                                        type="password" value="02:00:00:00:00:00" placeholder="旧密码" autocomplete="current-password"
                                         data-i18n-placeholder="old_password_placeholder">
                                 </label>
                             </div>
@@ -2115,14 +2315,16 @@
 
     <div class="toolbar">
         <div id="top_btn" class="top" onclick="scroolToTop()" style="display: none;opacity: 0;">
-            <svg width="100%" height="100%" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                <path fill="#ffffff"
+            <svg width="100%" fill="var(--dark-text-color)" stroke="currentColor" height="100%" viewBox="0 0 1024 1024"
+                version="1.1" xmlns="http://www.w3.org/2000/svg">
+                <path
                     d="M79.856 126.156V64.421h864.288v61.735H79.856z m61.735 432.146h30.867v-30.867h30.867v-30.867h30.867V465.7h30.867v-30.867h30.867v-30.87h30.867v-30.868h30.867V342.23h30.867v-30.867h30.867v-30.867h30.867v-30.867h30.867v-30.867h61.735v30.867h30.867v30.867h30.867v30.867h30.867v30.867h30.867v30.867h30.867v30.867h30.867v30.867h30.874v30.867h30.867v30.867h30.867v30.867h30.867v30.867h30.867v30.867h30.867v61.736H851.54v-30.867h-30.867v-30.868h-30.867V558.3H758.94v-30.867h-30.867v-30.867h-30.867v-30.867h-30.867v-30.867h-30.867v-30.868h-30.867v-30.867h-30.867V342.23H542.87v617.349h-61.738v-617.35h-30.867v30.867h-30.867v30.867h-30.867v30.867h-30.867v30.867h-30.867v30.867H295.93v30.867h-30.867v30.867h-30.867v30.867h-30.871v30.867h-30.867v30.867h-61.735v-61.735h30.867v-30.861z" />
             </svg>
         </div>
         <div class="refresh" onclick="location.reload()">
-            <svg width="100%" height="100%" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                <path fill="#ffffff"
+            <svg width="100%" fill="var(--dark-text-color)" stroke="currentColor" height="100%" viewBox="0 0 1024 1024"
+                version="1.1" xmlns="http://www.w3.org/2000/svg">
+                <path
                     d="M815.36 184.96V128a36.48 36.48 0 0 1 10.24-26.88 37.76 37.76 0 0 1 52.48 0 40.96 40.96 0 0 1 11.52 26.88v172.16a40.32 40.32 0 0 1-37.12 37.12h-173.44a40.32 40.32 0 0 1-26.88-11.52 37.76 37.76 0 0 1 0-52.48 35.84 35.84 0 0 1 26.88-10.24h108.8a372.48 372.48 0 0 0-453.12-75.52A367.36 367.36 0 0 0 170.24 364.8a374.4 374.4 0 0 0-19.84 242.56 369.92 369.92 0 0 0 132.48 202.24A375.04 375.04 0 0 0 512 888.32a368.64 368.64 0 0 0 263.68-108.8A376.32 376.32 0 0 0 885.12 512H960A448 448 0 1 1 136.32 270.08a438.4 438.4 0 0 1 192-164.48 444.16 444.16 0 0 1 256-32 455.68 455.68 0 0 1 230.4 111.36z" />
             </svg>
         </div>

@@ -3,7 +3,6 @@ package com.minikano.f50_sms.modules.deviceInfo
 import android.content.Context
 import android.os.StatFs
 import com.minikano.f50_sms.configs.AppMeta
-import com.minikano.f50_sms.configs.AppMeta.isReadUseTerms
 import com.minikano.f50_sms.modules.BASE_TAG
 import com.minikano.f50_sms.modules.PREFS_NAME
 import com.minikano.f50_sms.utils.KanoLog
@@ -30,7 +29,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import androidx.core.content.edit
 import com.minikano.f50_sms.utils.readNetConnCount
 import io.ktor.server.request.receiveText
-import kotlinx.serialization.json.JsonObject
+import org.json.JSONArray
 import org.json.JSONObject
 
 data class MyStorageInfo(
@@ -208,7 +207,8 @@ fun Route.baseDeviceInfoModule(context: Context) {
                 "cpuUsageInfo":$cpuUsageInfo,
                 "memInfo":$memInfo,
                 "current_now":$currentNow,
-                "voltage_now":$votageNow
+                "voltage_now":$votageNow,
+                "is_reached_data_flow_limit":${AppMeta.isReachedDataFlowLimit}
             }
         """.trimIndent()
         call.response.headers.append("Access-Control-Allow-Origin", "*")
@@ -226,6 +226,54 @@ fun Route.baseDeviceInfoModule(context: Context) {
             call.response.headers.append("Access-Control-Allow-Origin", "*")
             call.respondText(
                 """{"error":"获取连接信息出错(SELINUX状态：${KanoUtils.getSELinuxStatus()})"}""",
+                ContentType.Application.Json,
+                HttpStatusCode.InternalServerError
+            )
+        }
+    }
+
+    //流量信息获取（时间范围）
+    get("/api/cellularUsage") {
+        try {
+            val method = call.request.queryParameters["method"] ?: "date-range"
+            val startTime = call.request.queryParameters["startTime"]?.toLongOrNull()
+            val endTime = call.request.queryParameters["endTime"]?.toLongOrNull()
+
+            if (startTime == null) {
+                throw Exception("缺少参数 startTime")
+            }
+            if (endTime == null) {
+                throw Exception("缺少参数 endTime")
+            }
+
+            KanoLog.d(TAG, "cellularUsage 传入参数：startTime：$startTime endTime：$endTime method：$method")
+
+            val jsonResult = if (method != "mills-range") {
+                val res = KanoUtils.getRangeDailyDataUsage(context, startTime, endTime)
+
+                JSONObject().apply {
+                    put("result", "success")
+                    put("usage", JSONArray(res))
+                }.toString()
+            } else {
+                val res = KanoUtils.getRangeDataUsage(context, startTime, endTime)
+
+                JSONObject().apply {
+                    put("result", "success")
+                    put("usage", res.toString())
+                }.toString()
+            }
+
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(jsonResult, ContentType.Application.Json)
+
+        } catch (e: Exception) {
+            KanoLog.d("UFI_TOOLS_LOG", "获取流量使用情况出错：${e.message}")
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(
+                JSONObject().apply {
+                    put("error", "获取流量使用情况出错:${e.message}")
+                }.toString(),
                 ContentType.Application.Json,
                 HttpStatusCode.InternalServerError
             )
@@ -385,6 +433,169 @@ fun Route.baseDeviceInfoModule(context: Context) {
             call.response.headers.append("Access-Control-Allow-Origin", "*")
             call.respondText(
                 """{"error":"获取UsbDevices信息出错"}""",
+                ContentType.Application.Json,
+                HttpStatusCode.InternalServerError
+            )
+        }
+    }
+
+    //获取volte状态
+    get("/api/volte_status") {
+        try {
+            val slot = call.request.queryParameters["slot"]?.toIntOrNull() ?: 0
+            val res = KanoUtils.getVoLteState(context,slot)
+            val jsonResult = """
+            {
+                "enabled":$res
+            }
+        """.trimIndent()
+
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(jsonResult, ContentType.Application.Json)
+        } catch (e: Exception) {
+            KanoLog.d("UFI_TOOLS_LOG", "获取volte_status信息出错：${e.message}")
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(
+                """{"error":"获取volte_status信息出错"}""",
+                ContentType.Application.Json,
+                HttpStatusCode.InternalServerError
+            )
+        }
+    }
+
+    //获取vonr状态
+    get("/api/vonr_status") {
+        try {
+            val slot = call.request.queryParameters["slot"]?.toIntOrNull() ?: 0
+            val res = KanoUtils.getVoNrState(context,slot)
+            val jsonResult = """
+            {
+                "enabled":$res
+            }
+        """.trimIndent()
+
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(jsonResult, ContentType.Application.Json)
+        } catch (e: Exception) {
+            KanoLog.d("UFI_TOOLS_LOG", "获取vonr_status信息出错：${e.message}")
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(
+                """{"error":"获取vonr_status信息出错"}""",
+                ContentType.Application.Json,
+                HttpStatusCode.InternalServerError
+            )
+        }
+    }
+
+    //设置volte状态
+    post("/api/volte_status"){
+        try {
+            val body = call.receiveText()
+            val json = JSONObject(body)
+            var enabled = json.optString("enabled", "1").trim()
+            var slot = json.optString("slot", "0")
+
+            if(enabled != "0") enabled = "1"
+            if(slot != "0") slot = "1"
+
+            val ok = KanoUtils.setVoLteState(context,enabled,slot.toInt())
+
+            if(!ok) throw Exception("设置失败")
+
+            //存盘
+            val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            //持久化
+            sharedPrefs.edit(commit = true) {
+                putString("volte_status_$slot", enabled)
+            }
+
+            val jsonResult = """{"result":"success"}""".trimIndent()
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(jsonResult, ContentType.Application.Json)
+        } catch (e: Exception) {
+            KanoLog.d("UFI_TOOLS_LOG", "设置volte状态出错：${e.message}")
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(
+                """{"error":"设置volte状态出错"}""",
+                ContentType.Application.Json,
+                HttpStatusCode.InternalServerError
+            )
+        }
+    }
+
+    //设置vonr状态
+    post("/api/vonr_status"){
+        try {
+            val body = call.receiveText()
+            val json = JSONObject(body)
+            var enabled = json.optString("enabled", "1").trim()
+            var slot = json.optString("slot", "0")
+
+            if(enabled != "0") enabled = "1"
+            if(slot != "0") slot = "1"
+
+            val ok = KanoUtils.setVoNrState(context,enabled,slot.toInt())
+
+            if(!ok) throw Exception("设置失败")
+
+            //存盘
+            val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            //持久化
+            sharedPrefs.edit(commit = true) {
+                putString("vonr_status_$slot", enabled)
+            }
+
+            val jsonResult = """{"result":"success"}""".trimIndent()
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(jsonResult, ContentType.Application.Json)
+        } catch (e: Exception) {
+            KanoLog.d("UFI_TOOLS_LOG", "设置vonr状态出错：${e.message}")
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(
+                """{"error":"设置vonr状态出错"}""",
+                ContentType.Application.Json,
+                HttpStatusCode.InternalServerError
+            )
+        }
+    }
+
+    //保存官方后台cookie
+    post("/api/set_cookie"){
+        try {
+            val body = call.receiveText()
+            val json = JSONObject(body)
+            val ck = json.optString("cookie", "").trim()
+            if(ck.isEmpty()){
+                throw Exception("ck为空")
+            }
+
+            val result =  AppMeta.setWebServerCookie(ck)
+            val jsonResult = """{"result":$result}""".trimIndent()
+
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(jsonResult, ContentType.Application.Json)
+        } catch (e: Exception) {
+            KanoLog.d("UFI_TOOLS_LOG", "set_cookie出错：${e.message}")
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(
+                """{"error":"set_cookie出错"}""",
+                ContentType.Application.Json,
+                HttpStatusCode.InternalServerError
+            )
+        }
+    }
+
+    //读取官方后台cookie
+    get("/api/get_cookie") {
+        try {
+            val jsonResult = JSONObject().put("cookie", AppMeta.webServerCookie)
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(jsonResult.toString(), ContentType.Application.Json)
+        } catch (e: Exception) {
+            KanoLog.d("UFI_TOOLS_LOG", "get_cookie出错：${e.message}")
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.respondText(
+                """{"error":"get_cookie出错"}""",
                 ContentType.Application.Json,
                 HttpStatusCode.InternalServerError
             )
