@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 )
 
 // UfiStatus 定义中兴高通 X75 4G/5G 同步数据结构
@@ -18,7 +17,7 @@ type UfiStatus struct {
 }
 
 func main() {
-	// 主 Web UI 界面（采用原生系统色调，简洁易 scannable）
+	// 主 Web UI 界面（采用原生系统色调，简洁好用）
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		fmt.Fprintf(w, `
