@@ -1,0 +1,36 @@
+name: 编译 UFI-TOOLS 中兴 U60p 高通版
+
+on:
+  workflow_dispatch: # 支持在 GitHub 网页上手动点击运行
+
+jobs:
+  build-linux-binary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. 拉取 UFI-TOOLS 核心源码
+        uses: actions/checkout@v4
+
+      - name: 2. 配置 Go 语言编译环境
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: 3. 依赖项同步与缓存清理
+        run: |
+          go mod tidy || echo "No modules required"
+
+      - name: 4. 编译高通 64位 (ARM64) 4G/5G 同步版
+        run: |
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ufi-tools-u60p-arm64 main.go
+
+      - name: 5. 编译高通 32位 (ARM) 兼容版
+        run: |
+          GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o ufi-tools-u60p-arm32 main.go
+
+      - name: 6. 上传编译产物到 GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: U60p-UFI-TOOLS-Release
+          path: |
+            ufi-tools-u60p-arm64
+            ufi-tools-u60p-arm32
