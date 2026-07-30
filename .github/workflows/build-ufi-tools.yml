@@ -1,36 +1,33 @@
-name: 编译 UFI-TOOLS 中兴 U60p 高通版
+name: Build U60Pro Tools Clean Binary
 
 on:
-  workflow_dispatch: # 支持在 GitHub 网页上手动点击运行
+  workflow_dispatch: # 支持在 GitHub Actions 界面手动点击运行
 
 jobs:
   build-linux-binary:
     runs-on: ubuntu-latest
+
     steps:
-      - name: 1. 拉取 UFI-TOOLS 核心源码
+      # 1. 拉取仓库代码
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 2. 配置 Go 语言编译环境
+      # 2. 配置 Go 环境
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
 
-      - name: 3. 依赖项同步与缓存清理
+      # 3. 静态交叉编译 (针对 ARM64 / 高通 X75 架构)
+      - name: Build Arm64 Static Binary
         run: |
-          go mod tidy || echo "No modules required"
+          # CGO_ENABLED=0 是关键：彻底禁用 CGO，实现纯静态编译
+          # GOOS=linux GOARCH=arm64 确保目标平台为 64 位 Linux
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ufi-tools-u60p-arm64 main.go
 
-      - name: 4. 编译高通 64位 (ARM64) 4G/5G 同步版
-        run: |
-          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o ufi-tools-u60p-arm64 main.go
-
-      - name: 5. 编译高通 32位 (ARM) 兼容版
-        run: |
-          GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o ufi-tools-u60p-arm32 main.go
-
-      - name: 6. 上传编译产物到 GitHub Artifacts
+      # 4. 打包并提供下载
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: U60p-UFI-TOOLS-Release
-          path: |
-            ufi-tools-u60p-arm64
-            ufi-tools-u60p-arm32
+          name: ufi-tools-u60p-arm64
+          path: ufi-tools-u60p-arm64
