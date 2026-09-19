@@ -4589,18 +4589,22 @@ function main_func() {
                 method: 'GET',
                 headers: common_headers
             })).json()
-            const { smtp_host, smtp_port, smtp_username, smtp_password, smtp_to, forward_dev_info } = data
+            const { smtp_host, smtp_port, smtp_username, smtp_password, smtp_from, smtp_from_name, smtp_to, forward_dev_info } = data
             const smtpHostEl = document.querySelector('#smtp_host')
             const smtpPortEl = document.querySelector('#smtp_port')
             const smtpToEl = document.querySelector('#smtp_to')
             const smtpUsernameEl = document.querySelector('#smtp_username')
             const smtpPasswordEl = document.querySelector('#smtp_password')
+            const smtpFromEl = document.querySelector('#smtp_from')
+            const smtpFromNameEl = document.querySelector('#smtp_from_name')
             const forwardDevInfoEl = document.querySelector('#smsForwardForm input[name="forward_dev_info"]')
             forwardDevInfoEl.checked = forward_dev_info == "1"
             smtpHostEl.value = smtp_host || ''
             smtpPortEl.value = smtp_port || ''
             smtpUsernameEl.value = smtp_username || ''
             smtpPasswordEl.value = smtp_password || ''
+            smtpFromEl.value = smtp_from || ''
+            smtpFromNameEl.value = smtp_from_name || ''
             smtpToEl.value = smtp_to || ''
             needSwitch && switchSmsForwardMethodTab({ target: document.querySelector('#smtp_btn') })
         } else if (method.toLowerCase() == 'curl') {
@@ -4744,6 +4748,8 @@ function main_func() {
         const smtp_to = formData.get('smtp_to')
         const smtp_username = formData.get('smtp_username')
         const smtp_password = formData.get('smtp_password')
+        const smtp_from = formData.get('smtp_from')
+        const smtp_from_name = formData.get('smtp_from_name')
         const forward_dev_info = formData.get('forward_dev_info') != null
 
 
@@ -4751,6 +4757,8 @@ function main_func() {
         if (!smtp_port || smtp_port.trim() == '') return createToast(t('toast_please_input_smtp_port'), 'red')
         if (!smtp_username || smtp_username.trim() == '') return createToast(t('toast_please_input_smtp_username'), 'red')
         if (!smtp_password || smtp_password.trim() == '') return createToast(t('toast_please_input_smtp_pwd'), 'red')
+        // 发件邮箱可留空（回退为用户名），但填了就必须是邮箱，否则服务商必拒收
+        if (smtp_from && smtp_from.trim() != '' && !smtp_from.includes('@')) return createToast(t('toast_please_input_smtp_from'), 'red')
         if (!smtp_to || smtp_to.trim() == '') return createToast(t('toast_please_input_smtp_receive'), 'red')
 
         //请求
@@ -4766,6 +4774,8 @@ function main_func() {
                     smtp_port: smtp_port.trim(),
                     smtp_username: smtp_username.trim(),
                     smtp_password: smtp_password.trim(),
+                    smtp_from: smtp_from ? smtp_from.trim() : '',
+                    smtp_from_name: smtp_from_name ? smtp_from_name.trim() : '',
                     smtp_to: smtp_to.trim(),
                     forward_dev_info: forward_dev_info ? "1" : "0"
                 })
