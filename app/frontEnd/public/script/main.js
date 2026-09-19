@@ -2586,7 +2586,7 @@ function main_func() {
 
             if (station_list && station_list.length) {
                 conn_client_html += station_list.map(({ hostname, ip_addr, mac_addr }) => {
-                    let hostname_show = hostname
+                    let hostname_show = escapeHtml(hostname)
                     if (devices) {
                         hostname_show = devices.find(i => i.mac == mac_addr)?.hostname || hostname
                     }
@@ -2603,7 +2603,7 @@ function main_func() {
                 </div>
                 <div style="flex:1;text-align: right;">
                     <button class="btn" style="padding: 20px 4px;" 
-                        onclick="setOrRemoveDeviceFromBlackList('${[mac_addr, ...blackMacList].join(';')}','${[hostname, ...blackNameList].join(';')}','${AclMode}')">
+                        onclick="setOrRemoveDeviceFromBlackList('${[mac_addr, ...blackMacList].join(';')}','${[escapeHtml(hostname), ...blackNameList].join(';')}','${AclMode}')">
                         🚫 ${t('client_mgmt_block')}
                     </button>
                 </div>
@@ -2612,7 +2612,7 @@ function main_func() {
 
             if (lan_station_list && lan_station_list.length) {
                 conn_client_html += lan_station_list.map(({ hostname, ip_addr, mac_addr }) => {
-                    let hostname_show = hostname
+                    let hostname_show = escapeHtml(hostname)
                     if (devices) {
                         hostname_show = devices.find(i => i.mac == mac_addr)?.hostname || hostname
                     }
@@ -2629,7 +2629,7 @@ function main_func() {
                 </div>
                 <div style="flex:1;text-align: right;">
                     <button class="btn" style="padding: 20px 4px;" 
-                        onclick="setOrRemoveDeviceFromBlackList('${[mac_addr, ...blackMacList].join(';')}','${[hostname, ...blackNameList].join(';')}','${AclMode}')">
+                        onclick="setOrRemoveDeviceFromBlackList('${[mac_addr, ...blackMacList].join(';')}','${[escapeHtml(hostname), ...blackNameList].join(';')}','${AclMode}')">
                         🚫 ${t('client_mgmt_block')}
                     </button>
                 </div>
