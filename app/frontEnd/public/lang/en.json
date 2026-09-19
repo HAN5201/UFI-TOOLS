@@ -928,5 +928,11 @@
     "5g.band.n260": "mmWave/Overseas",
     "5g.band.n261": "mmWave/Overseas",
     "5g.band.n262": "mmWave/Overseas",
-    "5g.band.n263": "mmWave/Overseas"
+    "5g.band.n263": "mmWave/Overseas",
+    "boot_time": "Boot Time",
+    "time_d": "d",
+    "time_h": "h",
+    "time_min": "min",
+    "time_s": "s",
+    "time_ms": "ms"
 }

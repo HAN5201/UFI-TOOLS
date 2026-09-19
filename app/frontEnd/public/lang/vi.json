@@ -928,5 +928,11 @@
     "5g.band.n260": "mmWave/Ngoài",
     "5g.band.n261": "mmWave/Ngoài",
     "5g.band.n262": "mmWave/Ngoài",
-    "5g.band.n263": "mmWave/Ngoài"
+    "5g.band.n263": "mmWave/Ngoài",
+    "boot_time": "TG hoạt động",
+    "time_d": "d",
+    "time_h": "h",
+    "time_min": "min",
+    "time_s": "s",
+    "time_ms": "ms"
 }

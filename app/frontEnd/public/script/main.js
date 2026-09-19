@@ -307,6 +307,10 @@ function main_func() {
             }],
         propsShowList: [
             {
+                "name": "boot_time",
+                "isShow": true
+            },
+            {
                 "name": "client_ip",
                 "isShow": true
             },
@@ -1066,6 +1070,7 @@ function main_func() {
                 msisdn: notNullOrundefinedOrIsShow(res, 'msisdn') ? `<strong onclick="copyText(event)" class="blue">${t('msisdn')}：${res.msisdn}</strong>` : '',
                 internal_available_storage: (notNullOrundefinedOrIsShow(res, 'internal_available_storage') || notNullOrundefinedOrIsShow(res, 'internal_total_storage')) ? `<strong onclick="copyText(event)" class="blue">${t('internal_storage')}：${formatBytes(res.internal_used_storage)} ${t('used_storage')} / ${formatBytes(res.internal_total_storage)} ${t('total_storage')}</strong>` : '',
                 external_available_storage: (notNullOrundefinedOrIsShow(res, 'external_available_storage') || notNullOrundefinedOrIsShow(res, 'external_total_storage')) ? `<strong onclick="copyText(event)" class="blue">${t('sd_storage')}：${formatBytes(res.external_used_storage)} ${t('used_storage')} / ${formatBytes(res.external_total_storage)} ${t('total_storage')}</strong>` : '',
+                boot_time: notNullOrundefinedOrIsShow(res, 'boot_time') ? `<strong onclick="copyText(event)" class="blue">${t('boot_time')}：${formatBootTime(res.boot_time)}</strong>` : '',
             };
 
             html += `<li style="padding-top: 15px;"><p>`

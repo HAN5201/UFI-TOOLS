@@ -928,5 +928,11 @@
     "5g.band.n260": "ミリ波/海外",
     "5g.band.n261": "ミリ波/海外",
     "5g.band.n262": "ミリ波/海外",
-    "5g.band.n263": "ミリ波/海外"
+    "5g.band.n263": "ミリ波/海外",
+    "boot_time": "起動時間",
+    "time_d": "d",
+    "time_h": "h",
+    "time_min": "min",
+    "time_s": "s",
+    "time_ms": "ms"
 }
