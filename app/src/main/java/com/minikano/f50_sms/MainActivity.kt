@@ -187,9 +187,6 @@ class MainActivity : ComponentActivity() {
                 delay(4600)
                 exitProcess(-114514)
             } else {
-                //基本唤醒锁
-                WakeLock.exeBaseWakeLock(getSystemService(Context.POWER_SERVICE) as PowerManager)
-
                 requestNotificationPermissionIfNeeded()
 
                 // 忽略电池优化权限
@@ -291,8 +288,8 @@ class MainActivity : ComponentActivity() {
                         mutableStateOf(
                             sharedPrefs.getString(
                                 PREF_WAKELOCK,
-                                "lock"
-                            ) ?: "lock"
+                                "unlock"
+                            ) ?: "unlock"
                         )
                     }
 
@@ -330,8 +327,8 @@ class MainActivity : ComponentActivity() {
 
                                 wakeLock  = sharedPrefs.getString(
                                     PREF_WAKELOCK,
-                                    "lock"
-                                ) ?: "lock"
+                                    "unlock"
+                                ) ?: "unlock"
 
                                 KanoLog.d("UFI_TOOLS_LOG", "user touched stop btn")
                             }

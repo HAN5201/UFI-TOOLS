@@ -11,6 +11,17 @@ import io.ktor.server.application.call
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
+import org.json.JSONArray
+import org.json.JSONObject
+
+private object NrBandListCache {
+    private val lock = Any()
+    private var bands: List<Int>? = null
+
+    fun getOrQuery(query: () -> List<Int>): List<Int> = synchronized(lock) {
+        bands ?: query().also { bands = it }
+    }
+}
 
 fun Route.atModule(context: Context) {
     val TAG = "[$BASE_TAG]_atModule"
@@ -62,6 +73,45 @@ fun Route.atModule(context: Context) {
 
             call.respondText(
                 """{"error":"AT指令执行错误：${e.message}"}""",
+                ContentType.Application.Json,
+                HttpStatusCode.InternalServerError
+            )
+        }
+    }
+
+    // 查询基带支持的 NR 频段，供锁频页面动态渲染。
+    get("/api/getSupportNrBandList") {
+        try {
+            val slot = call.request.queryParameters["slot"]?.toIntOrNull() ?: 0
+            val bands = NrBandListCache.getOrQuery {
+                val raw = KanoUtils.runAT(context, "AT+SP5GCMDS=\"get nr support_band\"", slot)
+                if (raw.contains("ERROR", ignoreCase = true) || !raw.contains("+SP5GCMDS:", ignoreCase = true)) {
+                    throw IllegalStateException("查询 NR 支持频段失败：$raw")
+                }
+                raw
+                    .substringBefore("OK")
+                    .substringAfter(":", "")
+                    .split(",")
+                    .drop(1) // 第一个字段是命令名：get nr support_band
+                    .mapNotNull { it.trim().trim('"', '\\').toIntOrNull() }
+                    .distinct()
+            }
+            val bandsJson = JSONArray().apply {
+                bands.forEach(::put)
+            }
+
+            KanoLog.d(TAG, "getSupportNrBandList slot=$slot bands=$bands")
+            call.respondText(
+                JSONObject()
+                    .put("slot", slot)
+                    .put("band_list", bandsJson)
+                    .toString(),
+                ContentType.Application.Json
+            )
+        } catch (e: Exception) {
+            KanoLog.d(TAG, "getSupportNrBandList 错误：${e.message}")
+            call.respondText(
+                JSONObject().put("error", "getSupportNrBandList 错误：${e.message}").toString(),
                 ContentType.Application.Json,
                 HttpStatusCode.InternalServerError
             )

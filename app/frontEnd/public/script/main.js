@@ -307,6 +307,10 @@ function main_func() {
             }],
         propsShowList: [
             {
+                "name": "boot_time",
+                "isShow": true
+            },
+            {
                 "name": "client_ip",
                 "isShow": true
             },
@@ -798,6 +802,8 @@ function main_func() {
                 date = date.map((item, index) => {
                     return item + dateStrArr[index]
                 }).join('')
+                const contentEl = document.createElement('p')
+                contentEl.innerText = escapeHtml(decodeBase64(item.content))
                 return `<li class="sms-item" data-sms-id="${item.id}" data-sms-phone="${item.number}" data-sms-content="${item.content}" style="${item.tag == '3' ? 'background-color:#ffc0cb1f;margin-right:15px' : item.tag != '2' ? 'background-color:#0880001f;margin-left:15px' : 'background-color:#ffc0cb1f;margin-right:15px'}">
                                         <div class="arrow" style="${item.tag == '3' ? 'right:-30px;border-color: transparent transparent transparent #ffc0cb1f' : item.tag == '2' ? 'right:-30px;border-color: transparent transparent transparent #ffc0cb1f' : 'left:-30px;border-color: transparent #0880001f transparent transparent'}"></div>
                                         ${item.tag == "3" ? `<svg fill="var(--dark-text-color)" stroke="currentColor"  onclick="deleteAndReSendSms(${item.id})" class="icon" style="position: absolute;right: 50px;top: 18px;" width="14px" height="14px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
@@ -808,7 +814,7 @@ function main_func() {
                                             <svg fill="var(--dark-text-color)" stroke="currentColor"  xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" t="1742373390977" class="icon" viewBox="0 0 1024 1024" version="1.1" p-id="2837" width="16" height="16"><path d="M848 144H608V96a48 48 0 0 0-48-48h-96a48 48 0 0 0-48 48v48H176a48 48 0 0 0-48 48v48h768v-48a48 48 0 0 0-48-48zM176 928a48 48 0 0 0 48 48h576a48 48 0 0 0 48-48V288H176v640z m480-496a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z m-192 0a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z m-192 0a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z" p-id="2838"/></svg>
                                         </div>
                                         <p style="color:#adadad;font-size:16px;margin:4px 0">${item.number}${item.tag == '3' ? ` <span style="font-size:.7rem;color:red">(${t("toast_sms_send_failed")})</span>` : ""}</p>
-                                        <p>${decodeBase64(item.content)}</p>
+                                        <p>${contentEl.innerText}</p>
                                         <p style="text-align:right;color:#adadad;margin-top:4px">${date}</p>
                                     </li > `
             }).join('')
@@ -1064,6 +1070,7 @@ function main_func() {
                 msisdn: notNullOrundefinedOrIsShow(res, 'msisdn') ? `<strong onclick="copyText(event)" class="blue">${t('msisdn')}：${res.msisdn}</strong>` : '',
                 internal_available_storage: (notNullOrundefinedOrIsShow(res, 'internal_available_storage') || notNullOrundefinedOrIsShow(res, 'internal_total_storage')) ? `<strong onclick="copyText(event)" class="blue">${t('internal_storage')}：${formatBytes(res.internal_used_storage)} ${t('used_storage')} / ${formatBytes(res.internal_total_storage)} ${t('total_storage')}</strong>` : '',
                 external_available_storage: (notNullOrundefinedOrIsShow(res, 'external_available_storage') || notNullOrundefinedOrIsShow(res, 'external_total_storage')) ? `<strong onclick="copyText(event)" class="blue">${t('sd_storage')}：${formatBytes(res.external_used_storage)} ${t('used_storage')} / ${formatBytes(res.external_total_storage)} ${t('total_storage')}</strong>` : '',
+                boot_time: notNullOrundefinedOrIsShow(res, 'boot_time') ? `<strong onclick="copyText(event)" class="blue">${t('boot_time')}：${formatBootTime(res.boot_time)}</strong>` : '',
             };
 
             html += `<li style="padding-top: 15px;"><p>`
@@ -1161,18 +1168,15 @@ function main_func() {
                 if (!(await initRequestData())) {
                     return null
                 }
+                if (!(await checkAdvancedFunc())) {
+                    createToast(t('need_advance_func'), 'red')
+                    return null
+                }
                 const cookie = await login()
                 if (!cookie) {
                     createToast(t('toast_login_failed_check_network'), 'red')
                     out()
                     return null
-                }
-                // usb调试需要同步开启
-                if (!(res.enabled == "true" || res.enabled == true)) {
-                    await (await postData(cookie, {
-                        goformId: 'USB_PORT_SETTING',
-                        usb_port_switch: '1'
-                    })).json()
                 }
                 let res1 = await (await fetchWithTimeout(`${KANO_baseURL}/adb_wifi_setting`, {
                     method: 'POST',
@@ -1636,6 +1640,34 @@ function main_func() {
     }
     initLightStatus()
 
+    const DEFAULT_NR_5G_BANDS = [1, 5, 8, 28, 41, 78]
+
+    const renderBandList = (bands, el) => {
+        if (!el) return
+
+        el.querySelectorAll('tr[data-band-type="5G"]').forEach(row => row.remove())
+        const supportBands = [...new Set((Array.isArray(bands) ? bands : [])
+            .map(band => Number(String(band).replace(/^n/i, '')))
+            .filter(Number.isInteger)
+            .filter(band => band > 0))]
+            .sort((a, b) => a - b)
+
+        supportBands.forEach(band => {
+            const bandInfo = get5GBandInfo(band)
+            const bandEl = document.createElement('tr')
+            bandEl.dataset.bandType = '5G'
+            bandEl.innerHTML = `
+                <td><input type="checkbox" data-type="5G" data-band="${band}"></td>
+                <td>${bandInfo.band}</td>
+                <td>${bandInfo.range}</td>
+                <td>${bandInfo.mode}</td>
+                <td data-i18n="${bandInfo.i18nKey}">${t(bandInfo.i18nKey, bandInfo.operator)}</td>
+            `
+            el.appendChild(bandEl)
+        })
+        initBandsTrClick()
+    }
+
     const initBandForm = async () => {
         const el = document.querySelector('#bandsForm')
         if (!(await initRequestData()) || !el) {
@@ -1646,6 +1678,32 @@ function main_func() {
         }))
 
         if (!res) return null
+
+        const bandListEl = document.querySelector('#bandTable')
+        if (bandListEl) {
+            try {
+                const atSlot = document.querySelector('#AT_SLOT')?.value?.trim()
+                const slot = /^\d+$/.test(atSlot) ? atSlot : '0'
+                const response = await fetchWithTimeout(
+                    `${KANO_baseURL}/getSupportNrBandList?slot=${slot}`,
+                    { headers: common_headers }
+                )
+                if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+                const { band_list: supportBands } = await response.json()
+                if (!Array.isArray(supportBands) || supportBands.length === 0) {
+                    throw new Error('AT 未返回支持的 5G 频段')
+                }
+                renderBandList(supportBands, bandListEl)
+            } catch (error) {
+                console.warn('获取支持的 5G 频段列表失败：', error)
+                renderBandList(DEFAULT_NR_5G_BANDS, bandListEl)
+            }
+        }
+
+        document.querySelectorAll('#bandsForm input[type="checkbox"]').forEach(checkbox => {
+            checkbox.checked = false
+        })
 
         if (res['lte_band_lock']) {
             const bands = res['lte_band_lock'].split(',')
@@ -1672,8 +1730,8 @@ function main_func() {
     initBandForm()
 
     //网络协议栈开关
-    const networkStackSwitch = async (flag) => {
-        await executeATCommand(flag ? "AT+SFUN=4" : "AT+SFUN=5")
+    const networkStackSwitch = async (flag, slot = 0) => {
+        await executeATCommand(flag ? "AT+SFUN=4" : "AT+SFUN=5", slot)
     }
 
     const submitBandForm = async (e) => {
@@ -1682,6 +1740,16 @@ function main_func() {
             out()
             return null
         }
+        let lockBandBtn = document.querySelector("#lockBandBtn")
+        let unlockBandBtn = document.querySelector("#unlockBandBtn")
+        if (!lockBandBtn && !unlockBandBtn) {
+            console.log("找不到unlockBandBtn、lockBandBtn")
+            return
+        }
+
+        setBtnLoading(lockBandBtn, true)
+        setBtnLoading(unlockBandBtn, true)
+
         const form = e.target
         const bands = form.querySelectorAll('input[type="checkbox"]:checked')
         const lte_bands = []
@@ -1701,6 +1769,8 @@ function main_func() {
         if (!cookie) {
             createToast(t('toast_login_failed_check_network'), 'red')
             out()
+            setBtnLoading(lockBandBtn, false)
+            setBtnLoading(unlockBandBtn, false)
             return null
         }
         try {
@@ -1717,9 +1787,13 @@ function main_func() {
             if (res[0].result == 'success' || res[1].result == 'success') {
                 createToast(t('toast_set_band_success'), 'green')
                 //重启网络栈
-                await networkStackSwitch(false)
-                await wait(300)
-                await networkStackSwitch(true)
+                await networkStackSwitch(false, 0)
+                await wait(100)
+                await networkStackSwitch(false, 1)
+                await wait(100)
+                await networkStackSwitch(true, 0)
+                await wait(100)
+                await networkStackSwitch(true, 1)
                 // const netType = document.querySelector('#NET_TYPE')
                 // if (netType) {
                 //     const options = document.querySelectorAll('#NET_TYPE option')
@@ -1745,6 +1819,8 @@ function main_func() {
             createToast(t('toast_set_band_failed'), 'red')
         } finally {
             await initBandForm()
+            setBtnLoading(lockBandBtn, false)
+            setBtnLoading(unlockBandBtn, false)
         }
     }
 
@@ -2515,7 +2591,7 @@ function main_func() {
 
             if (station_list && station_list.length) {
                 conn_client_html += station_list.map(({ hostname, ip_addr, mac_addr }) => {
-                    let hostname_show = hostname
+                    let hostname_show = escapeHtml(hostname)
                     if (devices) {
                         hostname_show = devices.find(i => i.mac == mac_addr)?.hostname || hostname
                     }
@@ -2532,7 +2608,7 @@ function main_func() {
                 </div>
                 <div style="flex:1;text-align: right;">
                     <button class="btn" style="padding: 20px 4px;" 
-                        onclick="setOrRemoveDeviceFromBlackList('${[mac_addr, ...blackMacList].join(';')}','${[hostname, ...blackNameList].join(';')}','${AclMode}')">
+                        onclick="setOrRemoveDeviceFromBlackList('${[mac_addr, ...blackMacList].join(';')}','${[escapeHtml(hostname), ...blackNameList].join(';')}','${AclMode}')">
                         🚫 ${t('client_mgmt_block')}
                     </button>
                 </div>
@@ -2541,7 +2617,7 @@ function main_func() {
 
             if (lan_station_list && lan_station_list.length) {
                 conn_client_html += lan_station_list.map(({ hostname, ip_addr, mac_addr }) => {
-                    let hostname_show = hostname
+                    let hostname_show = escapeHtml(hostname)
                     if (devices) {
                         hostname_show = devices.find(i => i.mac == mac_addr)?.hostname || hostname
                     }
@@ -2558,7 +2634,7 @@ function main_func() {
                 </div>
                 <div style="flex:1;text-align: right;">
                     <button class="btn" style="padding: 20px 4px;" 
-                        onclick="setOrRemoveDeviceFromBlackList('${[mac_addr, ...blackMacList].join(';')}','${[hostname, ...blackNameList].join(';')}','${AclMode}')">
+                        onclick="setOrRemoveDeviceFromBlackList('${[mac_addr, ...blackMacList].join(';')}','${[escapeHtml(hostname), ...blackNameList].join(';')}','${AclMode}')">
                         🚫 ${t('client_mgmt_block')}
                     </button>
                 </div>
@@ -3148,8 +3224,8 @@ function main_func() {
 
 
     const executeATCommand = async (command, slot = null) => {
-        let at_slot_value = document.querySelector("#AT_SLOT")?.value
         if (slot == null || slot == undefined) {
+            let at_slot_value = document.querySelector("#AT_SLOT")?.value
             if (isNaN(Number(at_slot_value?.trim())) || at_slot_value == undefined || at_slot_value == null) {
                 slot = 0
             } else {
@@ -3167,22 +3243,32 @@ function main_func() {
 
     async function QOSRDPCommand(cmd) {
         if (!cmd) return QORS_MESSAGE = null
+        let sim_slot = null
         // 获取当前卡槽
-        let { sim_slot } = await getData(new URLSearchParams({
-            cmd: 'sim_slot'
-        }))
+        if (UFI_DATA && UFI_DATA.sim_slot != undefined && UFI_DATA.sim_slot != null && UFI_DATA.sim_slot != '') {
+            sim_slot = UFI_DATA.sim_slot
+        }
+        else {
+            let { sim_slot: s } = await getData(new URLSearchParams({
+                cmd: 'sim_slot'
+            }))
+            sim_slot = s
+        }
+
         //获取是否支持双sim卡
-        const { dual_sim_support } = await getData(new URLSearchParams({
-            cmd: 'dual_sim_support'
-        }))
+        let dual_sim_support = null
+        if (UFI_DATA && UFI_DATA.dual_sim_support != undefined && UFI_DATA.dual_sim_support != null && UFI_DATA.dual_sim_support != '') {
+            dual_sim_support = UFI_DATA.dual_sim_support
+        } else {
+            const { dual_sim_support: d } = await getData(new URLSearchParams({
+                cmd: 'dual_sim_support'
+            }))
+            dual_sim_support = d
+        }
+
         if (!sim_slot || dual_sim_support != '1') {
             //单卡用户默认0槽位
             sim_slot = 0
-        }
-
-        // For F50Pro
-        if (UFI_DATA && UFI_DATA.model == "MU3356" && (sim_slot == '0' || sim_slot == '1')) {
-            sim_slot = sim_slot == 1 ? 0 : 1
         }
 
         // V50 内置卡1(移动)slot=0 内置卡2(电信)slot=1 内置卡3(联通)slot=2 外置卡slot=11 外置卡 slot需要设置为0 联通内置卡slot设置为1
@@ -3802,6 +3888,7 @@ function main_func() {
             createToast(t('toast_please_login'), 'red')
             return null
         }
+
         if (speedFlag) {
             speedController.abort();
             createToast(t('toast_speed_test_cancel'));
@@ -3819,60 +3906,166 @@ function main_func() {
 
         const ckSize = document.querySelector('#speedTestModal #ckSize').value;
         const chunkSize = !isNaN(Number(ckSize)) ? Number(ckSize) : 1000;
+
         const resultDiv = document.getElementById('speedtestResult');
 
         const url = `${serverUrl}?ckSize=${chunkSize}&cors`;
+
         resultDiv.textContent = t('speedtest_running_btn');
 
+
         let totalBytes = 0;
-        let startTime = performance.now();
-        let lastUpdateTime = startTime;
+
+        // 速度计算
         let lastBytes = 0;
+        let lastTime = 0;
 
-        try {
-            const res = await fetch(url, { signal: speedSignal, headers: { ...common_headers } });
-            const reader = res.body.getReader();
+        // 滑动窗口
+        const speedSamples = [];
+        const MAX_SAMPLES = 5;
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+        let running = true;
+        let renderPending = false;
 
-                totalBytes += value.length;
-                const now = performance.now();
+        let currentSpeed = 0;
 
-                if (now - lastUpdateTime >= 80) {
-                    const elapsed = (now - lastUpdateTime) / 1000;
-                    const speed = ((totalBytes - lastBytes) * 8 / 1024 / 1024) / elapsed;
 
-                    resultDiv.innerHTML = `
+        function updateUI() {
+            if (!running || renderPending) return;
+
+            renderPending = true;
+
+            requestAnimationFrame(() => {
+                if (!running) {
+                    renderPending = false;
+                    return;
+                }
+
+                resultDiv.innerHTML = `
                 ${t('speedtest_testing')}<br/>
                 ${t('speedtest_total_download')}: ${(totalBytes / 1024 / 1024).toFixed(2)} MB<br/>
-                ${t('speedtest_current_speed')}: ${speed.toFixed(2)} Mbps
+                ${t('speedtest_current_speed')}: ${currentSpeed.toFixed(2)} Mbps
             `;
 
-                    lastUpdateTime = now;
+                renderPending = false;
+            });
+        }
+
+
+        try {
+
+            const res = await fetch(url, {
+                signal: speedSignal,
+                headers: {
+                    ...common_headers
+                }
+            });
+
+
+            const reader = res.body.getReader();
+
+
+            // 从真正开始收到数据计算
+            const startTime = performance.now();
+            lastTime = startTime;
+
+
+            while (true) {
+
+                const { done, value } = await reader.read();
+
+                if (done) break;
+
+
+                totalBytes += value.length;
+
+
+                const now = performance.now();
+
+                const elapsed = (now - lastTime) / 1000;
+
+
+                // 每50ms采样
+                if (elapsed >= 0.05) {
+
+
+                    const deltaBytes = totalBytes - lastBytes;
+
+
+                    const speed =
+                        (deltaBytes * 8 / 1024 / 1024) / elapsed;
+
+
+                    speedSamples.push(speed);
+
+
+                    if (speedSamples.length > MAX_SAMPLES) {
+                        speedSamples.shift();
+                    }
+
+
+                    currentSpeed =
+                        speedSamples.reduce(
+                            (a, b) => a + b,
+                            0
+                        ) / speedSamples.length;
+
+
+
                     lastBytes = totalBytes;
+                    lastTime = now;
+
+
+                    updateUI();
                 }
             }
 
-            const totalTime = (performance.now() - startTime) / 1000;
-            const avgSpeed = ((totalBytes * 8) / 1024 / 1024) / totalTime;
+
+            running = false;
+
+
+            const totalTime =
+                (performance.now() - startTime) / 1000;
+
+
+            const avgSpeed =
+                ((totalBytes * 8) / 1024 / 1024) /
+                totalTime;
+
 
             resultDiv.innerHTML += `
-        <br/>✅ ${t('speedtest_done')}<br/>
-        ${t('speedtest_total_time')}: ${totalTime.toFixed(2)} ${t('unit_seconds')}<br/>
-        ${t('speedtest_avg_speed')}: ${avgSpeed.toFixed(2)} Mbps
-    `;
+            <br/>✅ ${t('speedtest_done')}<br/>
+            ${t('speedtest_total_time')}: ${totalTime.toFixed(2)} ${t('unit_seconds')}<br/>
+            ${t('speedtest_avg_speed')}: ${avgSpeed.toFixed(2)} Mbps
+        `;
+
+
         } catch (err) {
+
+            running = false;
+
             if (err.name === 'AbortError') {
-                resultDiv.innerHTML += `<br/>⚠️ ${t('speedtest_aborted')}`;
+
+                resultDiv.innerHTML +=
+                    `<br/>⚠️ ${t('speedtest_aborted')}`;
+
             } else {
-                resultDiv.innerHTML = `❌ ${t('speedtest_failed')}: ${err.message}`;
+
+                resultDiv.innerHTML =
+                    `❌ ${t('speedtest_failed')}: ${err.message}`;
             }
+
         } finally {
+
+            running = false;
+
             speedFlag = false;
-            e.target.innerHTML = t('speedtest_start_btn');
+
+            e.target.innerHTML =
+                t('speedtest_start_btn');
+
             e.target.style.backgroundColor = '';
+
         }
     }
 
@@ -4292,7 +4485,7 @@ function main_func() {
             if (adbStatusEl && adbStatusEl.length > 0) {
                 adbStatusEl.forEach((item) => {
                     try {
-                        item.innerHTML = adb_text + `<br/>${t('usb_debugging_status')}：${adbSwitch ? `🟢 ${t('usb_debugging_active')}` : `🔴 ${t('usb_debugging_inactive')}`}` + `<br/>${t('firmware_version')}：${version}`
+                        item.innerHTML = adb_text + `<br/>${t('usb_debugging_status')}：${adbSwitch ? `${t('usb_debugging_active')}` : `${t('usb_debugging_inactive')}`}` + `<br/>${t('firmware_version')}：${version}`
                     } catch { }
                 })
             }
@@ -4401,18 +4594,22 @@ function main_func() {
                 method: 'GET',
                 headers: common_headers
             })).json()
-            const { smtp_host, smtp_port, smtp_username, smtp_password, smtp_to, forward_dev_info } = data
+            const { smtp_host, smtp_port, smtp_username, smtp_password, smtp_from, smtp_from_name, smtp_to, forward_dev_info } = data
             const smtpHostEl = document.querySelector('#smtp_host')
             const smtpPortEl = document.querySelector('#smtp_port')
             const smtpToEl = document.querySelector('#smtp_to')
             const smtpUsernameEl = document.querySelector('#smtp_username')
             const smtpPasswordEl = document.querySelector('#smtp_password')
+            const smtpFromEl = document.querySelector('#smtp_from')
+            const smtpFromNameEl = document.querySelector('#smtp_from_name')
             const forwardDevInfoEl = document.querySelector('#smsForwardForm input[name="forward_dev_info"]')
             forwardDevInfoEl.checked = forward_dev_info == "1"
             smtpHostEl.value = smtp_host || ''
             smtpPortEl.value = smtp_port || ''
             smtpUsernameEl.value = smtp_username || ''
             smtpPasswordEl.value = smtp_password || ''
+            smtpFromEl.value = smtp_from || ''
+            smtpFromNameEl.value = smtp_from_name || ''
             smtpToEl.value = smtp_to || ''
             needSwitch && switchSmsForwardMethodTab({ target: document.querySelector('#smtp_btn') })
         } else if (method.toLowerCase() == 'curl') {
@@ -4556,6 +4753,8 @@ function main_func() {
         const smtp_to = formData.get('smtp_to')
         const smtp_username = formData.get('smtp_username')
         const smtp_password = formData.get('smtp_password')
+        const smtp_from = formData.get('smtp_from')
+        const smtp_from_name = formData.get('smtp_from_name')
         const forward_dev_info = formData.get('forward_dev_info') != null
 
 
@@ -4563,6 +4762,8 @@ function main_func() {
         if (!smtp_port || smtp_port.trim() == '') return createToast(t('toast_please_input_smtp_port'), 'red')
         if (!smtp_username || smtp_username.trim() == '') return createToast(t('toast_please_input_smtp_username'), 'red')
         if (!smtp_password || smtp_password.trim() == '') return createToast(t('toast_please_input_smtp_pwd'), 'red')
+        // 发件邮箱可留空（回退为用户名），但填了就必须是邮箱，否则服务商必拒收
+        if (smtp_from && smtp_from.trim() != '' && !smtp_from.includes('@')) return createToast(t('toast_please_input_smtp_from'), 'red')
         if (!smtp_to || smtp_to.trim() == '') return createToast(t('toast_please_input_smtp_receive'), 'red')
 
         //请求
@@ -4578,6 +4779,8 @@ function main_func() {
                     smtp_port: smtp_port.trim(),
                     smtp_username: smtp_username.trim(),
                     smtp_password: smtp_password.trim(),
+                    smtp_from: smtp_from ? smtp_from.trim() : '',
+                    smtp_from_name: smtp_from_name ? smtp_from_name.trim() : '',
                     smtp_to: smtp_to.trim(),
                     forward_dev_info: forward_dev_info ? "1" : "0"
                 })
@@ -5581,8 +5784,8 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
 
             if (!file) return;
 
-            if (file.size > 1145 * 1024) {
-                const msg = `${t('toast_file_size_not_over_than')}${1145}KB！`
+            if (file.size > 10240 * 1024) {
+                const msg = `${t('toast_file_size_not_over_than')}${10240}KB！`
                 createToast(msg, 'red')
                 reject({ msg, data: null })
                 return
@@ -7879,9 +8082,9 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
             const voLTESwitchBtn = document.querySelector('#VoLTESwitchBtn')
             if (!voLTESwitchBtn) return
 
-            const res = await (await fetchWithTimeout(`${KANO_baseURL}/volte_status?slot=0`, {
+            const res = await (await fetchWithTimeout(`${KANO_baseURL}/volte_status`, {
                 method: "POST",
-                body: JSON.stringify({ enabled: voLTESwitchBtn.dataset.enabled == "1" ? "0" : "1" }),
+                body: JSON.stringify({ enabled: voLTESwitchBtn.dataset.enabled == "1" ? "0" : "1", slot: 0 }),
                 headers: common_headers
             })).json()
             if (res.result == "success") {
@@ -7900,9 +8103,9 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
             const voLTESwitchBtn1 = document.querySelector('#VoLTESwitchBtn1')
             if (!voLTESwitchBtn1) return
 
-            const res = await (await fetchWithTimeout(`${KANO_baseURL}/volte_status?slot=1`, {
+            const res = await (await fetchWithTimeout(`${KANO_baseURL}/volte_status`, {
                 method: "POST",
-                body: JSON.stringify({ enabled: voLTESwitchBtn1.dataset.enabled == "1" ? "0" : "1" }),
+                body: JSON.stringify({ enabled: voLTESwitchBtn1.dataset.enabled == "1" ? "0" : "1", slot: 1 }),
                 headers: common_headers
             })).json()
             if (res.result == "success") {
@@ -7921,9 +8124,9 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
             const voNRSwitchBtn = document.querySelector('#VoNRSwitchBtn')
             if (!voNRSwitchBtn) return
 
-            const res = await (await fetchWithTimeout(`${KANO_baseURL}/vonr_status?slot=0`, {
+            const res = await (await fetchWithTimeout(`${KANO_baseURL}/vonr_status`, {
                 method: "POST",
-                body: JSON.stringify({ enabled: voNRSwitchBtn.dataset.enabled == "1" ? "0" : "1" }),
+                body: JSON.stringify({ enabled: voNRSwitchBtn.dataset.enabled == "1" ? "0" : "1", slot: 0 }),
                 headers: common_headers
             })).json()
             if (res.result == "success") {
@@ -7942,9 +8145,9 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
             const voNRSwitchBtn1 = document.querySelector('#VoNRSwitchBtn1')
             if (!voNRSwitchBtn1) return
 
-            const res = await (await fetchWithTimeout(`${KANO_baseURL}/vonr_status?slot=1`, {
+            const res = await (await fetchWithTimeout(`${KANO_baseURL}/vonr_status`, {
                 method: "POST",
-                body: JSON.stringify({ enabled: voNRSwitchBtn1.dataset.enabled == "1" ? "0" : "1" }),
+                body: JSON.stringify({ enabled: voNRSwitchBtn1.dataset.enabled == "1" ? "0" : "1", slot: 1 }),
                 headers: common_headers
             })).json()
             if (res.result == "success") {
